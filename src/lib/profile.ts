@@ -40,7 +40,13 @@ export function defaultProfile(username: string): Profile {
     knownConcepts: [],
     tolerance: 1,
     readVerses: [],
-    updatedAt: Date.now(),
+    // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
+    // sync merge's last-write-wins comparison (see mergeProfiles in
+    // src/lib/sync.ts). A never-touched default must always lose to a real
+    // saved profile — local or remote — or a brand-new device would look
+    // "more recent" than another device's actual settings and clobber them
+    // on first sync, just because it happened to load a moment later.
+    updatedAt: 0,
   }
 }
 
