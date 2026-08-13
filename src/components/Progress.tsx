@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import { useScoringContext } from '../hooks/useScoringContext'
-import { coverageByBook } from '../lib/scorer'
+import { coverageByBook, readCoverageByBook } from '../lib/scorer'
 
 export function Progress({ corpus, profile }: { corpus: CorpusData; profile: Profile }) {
   const ctx = useScoringContext(corpus, profile)
@@ -10,6 +10,10 @@ export function Progress({ corpus, profile }: { corpus: CorpusData; profile: Pro
   const coverage = useMemo(
     () => coverageByBook(corpus.books, corpus.bookIndex, ctx),
     [corpus.books, corpus.bookIndex, ctx],
+  )
+  const readCoverage = useMemo(
+    () => readCoverageByBook(corpus.bookIndex, profile.readVerses),
+    [corpus.bookIndex, profile.readVerses],
   )
 
   const totalTokens = coverage.reduce((s, b) => s + b.totalTokens, 0)
@@ -49,6 +53,28 @@ export function Progress({ corpus, profile }: { corpus: CorpusData; profile: Pro
                 </div>
               )
             })}
+        </div>
+      </div>
+
+      <div>
+        <h3 className="mb-2 text-sm font-semibold text-stone-700 dark:text-stone-300">
+          Verses read by book
+        </h3>
+        <div className="space-y-1.5">
+          {readCoverage.map((b) => {
+            const pct = b.verseCount > 0 ? (b.readCount / b.verseCount) * 100 : 0
+            return (
+              <div key={b.bookId} className="flex items-center gap-3 text-sm">
+                <span className="w-14 shrink-0 text-stone-500 dark:text-stone-400">{b.abbr}</span>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100 dark:bg-stone-800">
+                  <div className="h-full rounded-full bg-sky-500" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="w-20 shrink-0 text-right text-xs text-stone-400">
+                  {b.readCount}/{b.verseCount}
+                </span>
+              </div>
+            )
+          })}
         </div>
       </div>
     </div>

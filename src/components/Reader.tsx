@@ -2,10 +2,23 @@ import { useMemo, useState } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import { useScoringContext } from '../hooks/useScoringContext'
-import { rankVerses } from '../lib/scorer'
+import { usePassages } from '../hooks/usePassages'
+import { rankPassages, type ScoredPassage } from '../lib/passages'
 import { VerseView } from './VerseView'
 
-const PAGE_SIZE = 15
+const PAGE_SIZE = 8
+
+function verseKey(bookId: number, chapter: number, verse: number): string {
+  return `${bookId}.${chapter}.${verse}`
+}
+
+function formatPassageRef(bookAbbr: string, passage: ScoredPassage): string {
+  const first = passage.verses[0]
+  const last = passage.verses[passage.verses.length - 1]
+  if (passage.verses.length === 1) return `${bookAbbr} ${first.chapter}:${first.verse}`
+  if (first.chapter === last.chapter) return `${bookAbbr} ${first.chapter}:${first.verse}-${last.verse}`
+  return `${bookAbbr} ${first.chapter}:${first.verse}-${last.chapter}:${last.verse}`
+}
 
 export function Reader({
   corpus,
@@ -19,28 +32,43 @@ export function Reader({
   const [visible, setVisible] = useState(PAGE_SIZE)
 
   const ctx = useScoringContext(corpus, profile)
+  const passages = usePassages(corpus)
 
   const ranked = useMemo(
-    () => rankVerses(corpus.books, ctx, { tolerance: profile.tolerance }),
-    [corpus.books, ctx, profile.tolerance],
+    () => rankPassages(passages, ctx, { tolerance: profile.tolerance }),
+    [passages, ctx, profile.tolerance],
   )
 
   const readSet = new Set(profile.readVerses)
-  const unread = ranked.filter((s) => !readSet.has(`${s.bookId}.${s.chapter}.${s.verse}`))
+  const unread = ranked.filter(
+    (p) => !p.verses.every((v) => readSet.has(verseKey(p.bookId, v.chapter, v.verse))),
+  )
 
-  function markRead(key: string) {
+  function markVerse(key: string) {
     onChange((p) => (p.readVerses.includes(key) ? p : { ...p, readVerses: [...p.readVerses, key] }))
+  }
+
+  function unmarkVerse(key: string) {
+    onChange((p) => ({ ...p, readVerses: p.readVerses.filter((k) => k !== key) }))
+  }
+
+  function markPassage(passage: ScoredPassage) {
+    onChange((p) => {
+      const set = new Set(p.readVerses)
+      for (const v of passage.verses) set.add(verseKey(passage.bookId, v.chapter, v.verse))
+      return { ...p, readVerses: [...set] }
+    })
   }
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-stone-500 dark:text-stone-400">
-          <strong>{ranked.length.toLocaleString()}</strong> verses readable at tolerance{' '}
+          <strong>{ranked.length.toLocaleString()}</strong> passages readable at tolerance{' '}
           {profile.tolerance} · {unread.length.toLocaleString()} unread
         </p>
         <label className="flex items-center gap-2 text-sm text-stone-600 dark:text-stone-300">
-          Tolerance (unknown words allowed)
+          Tolerance (unknown words allowed per verse)
           <input
             type="range"
             min={0}
@@ -59,31 +87,62 @@ export function Reader({
         </p>
       ) : (
         <div className="space-y-6">
-          {unread.slice(0, visible).map((s) => {
-            const key = `${s.bookId}.${s.chapter}.${s.verse}`
-            const book = corpus.bookIndex.find((b) => b.id === s.bookId)!
+          {unread.slice(0, visible).map((passage) => {
+            const book = corpus.bookIndex.find((b) => b.id === passage.bookId)!
+            const ref = formatPassageRef(book.abbr, passage)
+            const passageKey = verseKey(passage.bookId, passage.verses[0].chapter, passage.verses[0].verse)
+
             return (
               <div
-                key={key}
+                key={passageKey}
                 className="rounded-lg border border-stone-200 p-4 dark:border-stone-800"
               >
-                <VerseView
-                  verse={s.raw}
-                  bookAbbr={book.abbr}
-                  lemmas={corpus.lemmas}
-                  rmacTable={corpus.rmacTable}
-                  knownForms={ctx.knownForms}
-                  blockerIndices={new Set(s.blockerIndices)}
-                />
-                <div className="mt-3 flex items-center justify-between">
+                <div className="mb-3 flex items-center justify-between">
+                  <p className="text-xs font-medium uppercase tracking-wide text-stone-400">
+                    {ref}
+                    {passage.verses.length > 1 && ` · ${passage.verses.length} verses`}
+                  </p>
                   <span className="text-xs text-stone-400">
-                    {s.blockers === 0 ? 'Fully known' : `${s.blockers} unknown word${s.blockers > 1 ? 's' : ''}`}
+                    {passage.totalBlockers === 0
+                      ? 'Fully known'
+                      : `${passage.totalBlockers} unknown word${passage.totalBlockers > 1 ? 's' : ''}`}
                   </span>
+                </div>
+
+                <div className="space-y-3">
+                  {passage.verses.map((sv) => {
+                    const key = verseKey(passage.bookId, sv.chapter, sv.verse)
+                    const isRead = readSet.has(key)
+                    return (
+                      <div key={key} className="flex items-start gap-2">
+                        <input
+                          type="checkbox"
+                          checked={isRead}
+                          onChange={() => (isRead ? unmarkVerse(key) : markVerse(key))}
+                          title={isRead ? 'Mark unread' : 'Mark read'}
+                          className="mt-1.5 shrink-0 accent-stone-900 dark:accent-stone-100"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <VerseView
+                            verse={sv.raw}
+                            bookAbbr={book.abbr}
+                            lemmas={corpus.lemmas}
+                            rmacTable={corpus.rmacTable}
+                            knownForms={ctx.knownForms}
+                            blockerIndices={new Set(sv.blockerIndices)}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <div className="mt-3 flex justify-end">
                   <button
-                    onClick={() => markRead(key)}
+                    onClick={() => markPassage(passage)}
                     className="rounded-md bg-stone-900 px-3 py-1 text-xs font-medium text-white hover:bg-stone-700 dark:bg-stone-100 dark:text-stone-900"
                   >
-                    Mark read
+                    Mark passage read
                   </button>
                 </div>
               </div>

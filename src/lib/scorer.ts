@@ -122,3 +122,24 @@ export function coverageByBook(
 
   return out.sort((a, b) => a.bookId - b.bookId)
 }
+
+/** Actual reading progress per book: how many of its verses are in profile.readVerses. */
+export function readCoverageByBook(
+  bookIndex: BookIndexEntry[],
+  readVerses: string[],
+): { bookId: number; abbr: string; readCount: number; verseCount: number }[] {
+  const readCounts = new Map<number, number>()
+  for (const key of readVerses) {
+    const bookId = Number(key.split('.')[0])
+    readCounts.set(bookId, (readCounts.get(bookId) ?? 0) + 1)
+  }
+
+  return bookIndex
+    .map((b) => ({
+      bookId: b.id,
+      abbr: b.abbr,
+      readCount: readCounts.get(b.id) ?? 0,
+      verseCount: b.verseCount,
+    }))
+    .sort((a, b) => a.bookId - b.bookId)
+}
