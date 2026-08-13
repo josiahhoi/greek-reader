@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { CorpusToken, CorpusVerse, LemmaEntry, RmacEntry } from '../lib/corpusTypes'
-import { VERB_FORMS } from '../data/verbForms'
+import { WordDetail } from './WordDetail'
 
 function TokenView({
   tok,
@@ -17,8 +17,6 @@ function TokenView({
 }) {
   const [open, setOpen] = useState(false)
   const rmac = rmacTable[tok.r]
-  const form = rmac && rmac.form >= 0 ? VERB_FORMS[rmac.form] : undefined
-  const missingForm = form && !knownForms.has(form.id) ? form : undefined
 
   return (
     <span className="relative inline-block">
@@ -37,20 +35,7 @@ function TokenView({
       </button>
       {open && (
         <div className="absolute left-1/2 top-full z-10 mt-1 w-56 -translate-x-1/2 rounded-lg border border-stone-200 bg-white p-3 text-left text-sm shadow-lg dark:border-stone-700 dark:bg-stone-900">
-          <p className="greek text-lg font-medium text-stone-900 dark:text-stone-100">
-            {lemma.lemma}
-          </p>
-          <p className="text-stone-500 dark:text-stone-400">{lemma.gloss}</p>
-          {rmac && (
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{rmac.label}</p>
-          )}
-          <p className="mt-1 text-xs text-stone-400">in context: “{tok.g}”</p>
-          {missingForm && (
-            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-              Verb form not yet known: {missingForm.tense} {missingForm.voice} {missingForm.mood}
-            </p>
-          )}
-          <p className="mt-2 text-xs text-stone-400">Strong's {lemma.strongs}</p>
+          <WordDetail lemma={lemma} rmac={rmac} knownForms={knownForms} contextGloss={tok.g} />
         </div>
       )}
     </span>
