@@ -24,7 +24,7 @@ function union(a: string[], b: string[]): string[] {
 /**
  * Merges a local and remote profile for the same username.
  *
- * `readVerses`, `knownConcepts`, and `extraKnownLemmas` are cumulative
+ * `readVerses`, `knownVerbForms`, and `extraKnownLemmas` are cumulative
  * progress — union them so nothing marked known/read on either side is ever
  * lost, without needing per-field timestamps.
  *
@@ -40,7 +40,7 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
     excludedLemmas: settingsSource.excludedLemmas,
     tolerance: settingsSource.tolerance,
     extraKnownLemmas: union(local.extraKnownLemmas, remote.extraKnownLemmas),
-    knownConcepts: union(local.knownConcepts, remote.knownConcepts),
+    knownVerbForms: union(local.knownVerbForms ?? [], remote.knownVerbForms ?? []),
     readVerses: union(local.readVerses, remote.readVerses),
     updatedAt: Math.max(local.updatedAt, remote.updatedAt),
   }

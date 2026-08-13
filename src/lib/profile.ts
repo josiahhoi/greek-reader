@@ -12,8 +12,8 @@ export interface Profile {
   extraKnownLemmas: string[]
   /** Lemma strings marked explicitly NOT known, overriding the frequency threshold. */
   excludedLemmas: string[]
-  /** Concept ids (see src/data/concepts.ts) marked known. */
-  knownConcepts: string[]
+  /** Verb form ids (see src/data/verbForms.ts) marked known. */
+  knownVerbForms: string[]
   /** How many blocking tokens a verse may have and still count as "readable". */
   tolerance: number
   /** "bookId.chapter.verse" keys the learner has marked read. */
@@ -37,7 +37,7 @@ export function defaultProfile(username: string): Profile {
     vocabThreshold: 50,
     extraKnownLemmas: [],
     excludedLemmas: [],
-    knownConcepts: [],
+    knownVerbForms: [],
     tolerance: 1,
     readVerses: [],
     // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
@@ -54,12 +54,52 @@ function storageKey(username: string): string {
   return `greek-reader:profile:${normalizeUsername(username)}`
 }
 
+/**
+ * Strips fields from superseded profile versions.
+ *
+ * `knownConcepts` held the old atomic-grammar ids (`pos.noun`, `tense.aorist`,
+ * …). There is no honest migration to the verb-form model that replaced it:
+ * knowing "aorist" and "subjunctive" as independent checkboxes never implied
+ * knowing the aorist subjunctive, so mapping them forward would overstate what
+ * the learner actually knows. Grammar selections reset; vocabulary is kept.
+ *
+ * Dropping the key here (rather than just ignoring it) matters because the
+ * Firestore sync union-merges array fields — left in place, dead ids would be
+ * carried in the remote document forever.
+ */
+const LEGACY_KEYS = ['knownConcepts'] as const
+
+function stripLegacyFields(parsed: Record<string, unknown>): {
+  cleaned: Record<string, unknown>
+  didStrip: boolean
+} {
+  const cleaned = { ...parsed }
+  let didStrip = false
+  for (const key of LEGACY_KEYS) {
+    if (key in cleaned) {
+      delete cleaned[key]
+      didStrip = true
+    }
+  }
+  return { cleaned, didStrip }
+}
+
 export function loadProfile(username: string): Profile {
   const raw = localStorage.getItem(storageKey(username))
   if (!raw) return defaultProfile(username)
   try {
-    const parsed = JSON.parse(raw) as Partial<Profile>
-    return { ...defaultProfile(username), ...parsed, username: normalizeUsername(username) }
+    const { cleaned, didStrip } = stripLegacyFields(JSON.parse(raw) as Record<string, unknown>)
+    const profile: Profile = {
+      ...defaultProfile(username),
+      ...(cleaned as Partial<Profile>),
+      username: normalizeUsername(username),
+    }
+    // Persist the migration immediately rather than waiting for the next edit
+    // or a successful sync — otherwise a profile that's only ever read keeps
+    // the dead key forever, and an offline/failed first sync leaves it there
+    // indefinitely.
+    if (didStrip) saveProfile(profile)
+    return profile
   } catch {
     return defaultProfile(username)
   }

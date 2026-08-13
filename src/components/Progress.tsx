@@ -1,16 +1,15 @@
 import { useMemo } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
-import { deriveKnownConcepts, deriveKnownLemmas } from '../lib/deriveKnown'
+import { useScoringContext } from '../hooks/useScoringContext'
 import { coverageByBook } from '../lib/scorer'
 
 export function Progress({ corpus, profile }: { corpus: CorpusData; profile: Profile }) {
-  const knownLemmas = useMemo(() => deriveKnownLemmas(profile, corpus.lemmas), [profile, corpus.lemmas])
-  const knownConcepts = useMemo(() => deriveKnownConcepts(profile), [profile])
+  const ctx = useScoringContext(corpus, profile)
 
   const coverage = useMemo(
-    () => coverageByBook(corpus.books, corpus.bookIndex, knownLemmas, knownConcepts),
-    [corpus.books, corpus.bookIndex, knownLemmas, knownConcepts],
+    () => coverageByBook(corpus.books, corpus.bookIndex, ctx),
+    [corpus.books, corpus.bookIndex, ctx],
   )
 
   const totalTokens = coverage.reduce((s, b) => s + b.totalTokens, 0)

@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useCorpus } from './hooks/useCorpus'
 import { useSyncedProfile } from './hooks/useSyncedProfile'
 import { UsernameGate } from './components/UsernameGate'
-import { GrammarSetup } from './components/GrammarSetup'
+import { VerbFormSetup } from './components/VerbFormSetup'
 import { VocabSetup } from './components/VocabSetup'
 import { Reader } from './components/Reader'
 import { Progress } from './components/Progress'
@@ -38,7 +38,7 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
   }
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'grammar', label: 'Grammar' },
+    { id: 'grammar', label: 'Verb forms' },
     { id: 'vocab', label: 'Vocabulary' },
     { id: 'read', label: 'Read' },
     { id: 'progress', label: 'Progress' },
@@ -79,7 +79,7 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
 
       <main className="mx-auto max-w-3xl px-4 py-6">
         {tab === 'grammar' && (
-          <GrammarSetup profile={profile} conceptStats={corpus.conceptStats} onChange={updateProfile} />
+          <VerbFormSetup profile={profile} formStats={corpus.formStats} onChange={updateProfile} />
         )}
         {tab === 'vocab' && (
           <VocabSetup profile={profile} lemmas={corpus.lemmas} onChange={updateProfile} />

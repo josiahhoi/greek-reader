@@ -3,7 +3,8 @@
   "verseCount": 7941,
   "lemmaCount": 5395,
   "rmacCodeCount": 1111,
-  "conceptCount": 60,
-  "generatedAt": "2026-08-13T04:33:46.298Z",
+  "verbFormCount": 90,
+  "verbTokenCount": 28113,
+  "generatedAt": "2026-08-13T18:33:33.427Z",
   "source": "OpenGNT (eliranwong/OpenGNT), CC BY-SA 4.0"
 }

@@ -1,12 +1,20 @@
-import type { BookIndexEntry, CorpusMeta, CorpusVerse, LemmaEntry } from './corpusTypes'
+import type {
+  BookIndexEntry,
+  CorpusMeta,
+  CorpusVerse,
+  LemmaEntry,
+  RmacEntry,
+} from './corpusTypes'
 
 export interface CorpusData {
   meta: CorpusMeta
   lemmas: LemmaEntry[]
   bookIndex: BookIndexEntry[]
   books: Map<number, CorpusVerse[]>
-  /** concept id -> number of corpus tokens carrying that concept. */
-  conceptStats: Record<string, number>
+  /** Interned parse table; token.r indexes into this. */
+  rmacTable: RmacEntry[]
+  /** verb form id -> number of corpus tokens in that form. */
+  formStats: Record<string, number>
 }
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -23,11 +31,12 @@ async function fetchJson<T>(url: string): Promise<T> {
  */
 export async function loadCorpus(onProgress?: (loaded: number, total: number) => void): Promise<CorpusData> {
   const base = import.meta.env.BASE_URL
-  const [meta, lemmas, bookIndex, conceptStats] = await Promise.all([
+  const [meta, lemmas, bookIndex, rmacTable, formStats] = await Promise.all([
     fetchJson<CorpusMeta>(`${base}data/meta.json`),
     fetchJson<LemmaEntry[]>(`${base}data/lemmas.json`),
     fetchJson<BookIndexEntry[]>(`${base}data/books-index.json`),
-    fetchJson<Record<string, number>>(`${base}data/concept-stats.json`),
+    fetchJson<RmacEntry[]>(`${base}data/rmac-table.json`),
+    fetchJson<Record<string, number>>(`${base}data/form-stats.json`),
   ])
 
   const books = new Map<number, CorpusVerse[]>()
@@ -41,5 +50,5 @@ export async function loadCorpus(onProgress?: (loaded: number, total: number) =>
     }),
   )
 
-  return { meta, lemmas, bookIndex, books, conceptStats }
+  return { meta, lemmas, bookIndex, books, rmacTable, formStats }
 }

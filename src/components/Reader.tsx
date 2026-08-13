@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
-import { deriveKnownConcepts, deriveKnownLemmas } from '../lib/deriveKnown'
+import { useScoringContext } from '../hooks/useScoringContext'
 import { rankVerses } from '../lib/scorer'
 import { VerseView } from './VerseView'
 
@@ -18,12 +18,11 @@ export function Reader({
 }) {
   const [visible, setVisible] = useState(PAGE_SIZE)
 
-  const knownLemmas = useMemo(() => deriveKnownLemmas(profile, corpus.lemmas), [profile, corpus.lemmas])
-  const knownConcepts = useMemo(() => deriveKnownConcepts(profile), [profile])
+  const ctx = useScoringContext(corpus, profile)
 
   const ranked = useMemo(
-    () => rankVerses(corpus.books, knownLemmas, knownConcepts, { tolerance: profile.tolerance }),
-    [corpus.books, knownLemmas, knownConcepts, profile.tolerance],
+    () => rankVerses(corpus.books, ctx, { tolerance: profile.tolerance }),
+    [corpus.books, ctx, profile.tolerance],
   )
 
   const readSet = new Set(profile.readVerses)
@@ -72,7 +71,8 @@ export function Reader({
                   verse={s.raw}
                   bookAbbr={book.abbr}
                   lemmas={corpus.lemmas}
-                  knownConcepts={knownConcepts}
+                  rmacTable={corpus.rmacTable}
+                  knownForms={ctx.knownForms}
                   blockerIndices={new Set(s.blockerIndices)}
                 />
                 <div className="mt-3 flex items-center justify-between">

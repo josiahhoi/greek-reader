@@ -10,31 +10,15 @@ import { ensureOpenGntCsv, ensureRmacLexiconCsv } from './lib/sources.ts'
 import { parseRmacLexicon } from './lib/rmac-lexicon.ts'
 import { parseOpenGnt, type RawToken } from './lib/opengnt.ts'
 import { decodeRmacDescription } from '../src/lib/rmac.ts'
-import { CONCEPT_IDS } from '../src/data/concepts.ts'
+import { VERB_FORM_IDS } from '../src/data/verbForms.ts'
 import { BOOKS } from '../src/data/books.ts'
-import type { CorpusToken, CorpusVerse } from '../src/lib/corpusTypes.ts'
+import type { CorpusToken, CorpusVerse, RmacEntry } from '../src/lib/corpusTypes.ts'
 
 const OUT_DIR = path.resolve(import.meta.dirname, '..', 'public', 'data')
 
-const CONCEPT_INDEX: Record<string, number> = Object.fromEntries(
-  CONCEPT_IDS.map((id, i) => [id, i]),
+const VERB_FORM_INDEX: Record<string, number> = Object.fromEntries(
+  VERB_FORM_IDS.map((id, i) => [id, i]),
 )
-
-function conceptIndices(ids: string[]): number[] {
-  return ids.map((id) => {
-    const i = CONCEPT_INDEX[id]
-    if (i === undefined) throw new Error(`Concept id "${id}" not found in CONCEPT_IDS`)
-    return i
-  })
-}
-
-/** Contract verbs and μι-verbs are visible straight from the lemma's ending. */
-function verbClassConcepts(lemma: string): string[] {
-  const out: string[] = []
-  if (/(?:άω|έω|όω)$/.test(lemma)) out.push('verb.contract')
-  if (/μι$/.test(lemma)) out.push('verb.mi')
-  return out
-}
 
 interface LemmaEntry {
   id: number
@@ -60,11 +44,15 @@ async function main() {
   const tokens = parseOpenGnt(csvPath)
   console.log(`  ${tokens.length} tokens`)
 
-  // --- Decode every token's RMAC code to a concept set, fail-fast on gaps ---
-  const rmacDecodeCache = new Map<string, string[]>()
-  function decodeToken(t: RawToken): string[] {
-    let concepts = rmacDecodeCache.get(t.rmac)
-    if (concepts) return concepts
+  // --- Intern every distinct RMAC code, fail-fast on gaps ---
+  // Each token stores only an index into this table; the table carries both the
+  // display parse and the gating verb-form index.
+  const rmacTable: RmacEntry[] = []
+  const rmacIndexByCode = new Map<string, number>()
+  function rmacId(t: RawToken): number {
+    const cached = rmacIndexByCode.get(t.rmac)
+    if (cached !== undefined) return cached
+
     const description = rmacDescriptions.get(t.rmac)
     if (description === undefined) {
       throw new Error(
@@ -72,9 +60,22 @@ async function main() {
           `which is not in the analytical lexicon.`,
       )
     }
-    concepts = decodeRmacDescription(t.rmac, description)
-    rmacDecodeCache.set(t.rmac, concepts)
-    return concepts
+    const { formId, label } = decodeRmacDescription(t.rmac, description)
+    let form = -1
+    if (formId !== null) {
+      form = VERB_FORM_INDEX[formId] ?? -1
+      if (form === -1) {
+        throw new Error(
+          `RMAC ${t.rmac} decoded to verb form "${formId}", which is not in VERB_FORMS. ` +
+            `src/data/verbForms.ts is out of sync with the decoder.`,
+        )
+      }
+    }
+
+    const idx = rmacTable.length
+    rmacTable.push({ code: t.rmac, label, form })
+    rmacIndexByCode.set(t.rmac, idx)
+    return idx
   }
 
   // --- Build lemma table (first-seen gloss/strongs, frequency across corpus) ---
@@ -96,16 +97,19 @@ async function main() {
   }
 
   // --- Walk tokens, grouping into verses, per book ---
-  const conceptTokenCounts = new Map<number, number>()
+  const formTokenCounts = new Map<number, number>()
+  let verbTokenCount = 0
   const booksOut = new Map<number, Map<string, OutVerse>>()
   const bookVerseOrder = new Map<number, string[]>()
 
   for (const t of tokens) {
     const id = lemmaId(t)
-    const staticConcepts = decodeToken(t)
-    const derivedConcepts = staticConcepts.includes('pos.verb') ? verbClassConcepts(t.lemma) : []
-    const cIdx = conceptIndices([...staticConcepts, ...derivedConcepts])
-    for (const c of cIdx) conceptTokenCounts.set(c, (conceptTokenCounts.get(c) ?? 0) + 1)
+    const rIdx = rmacId(t)
+    const form = rmacTable[rIdx].form
+    if (form >= 0) {
+      verbTokenCount++
+      formTokenCounts.set(form, (formTokenCounts.get(form) ?? 0) + 1)
+    }
 
     if (!booksOut.has(t.book)) {
       booksOut.set(t.book, new Map())
@@ -124,7 +128,7 @@ async function main() {
       b: t.before,
       a: t.after,
       l: id,
-      c: cIdx,
+      r: rIdx,
       g: t.glossLiteral,
       s: t.glossStudy,
     })
@@ -140,9 +144,11 @@ async function main() {
     JSON.stringify(lemmas.map(({ lemma, gloss, strongs, freq }) => ({ lemma, gloss, strongs, freq }))),
   )
 
-  const conceptStats: Record<string, number> = {}
-  for (const [idx, count] of conceptTokenCounts) conceptStats[CONCEPT_IDS[idx]] = count
-  writeFileSync(path.join(OUT_DIR, 'concept-stats.json'), JSON.stringify(conceptStats))
+  writeFileSync(path.join(OUT_DIR, 'rmac-table.json'), JSON.stringify(rmacTable))
+
+  const formStats: Record<string, number> = {}
+  for (const [idx, count] of formTokenCounts) formStats[VERB_FORM_IDS[idx]] = count
+  writeFileSync(path.join(OUT_DIR, 'form-stats.json'), JSON.stringify(formStats))
 
   let verseCount = 0
   const booksIndex: { id: number; abbr: string; name: string; verseCount: number }[] = []
@@ -164,8 +170,9 @@ async function main() {
         tokenCount: tokens.length,
         verseCount,
         lemmaCount: lemmas.length,
-        rmacCodeCount: rmacDescriptions.size,
-        conceptCount: CONCEPT_IDS.length,
+        rmacCodeCount: rmacTable.length,
+        verbFormCount: VERB_FORM_IDS.length,
+        verbTokenCount,
         generatedAt: new Date().toISOString(),
         source: 'OpenGNT (eliranwong/OpenGNT), CC BY-SA 4.0',
       },
@@ -175,6 +182,10 @@ async function main() {
   )
 
   console.log(`Done. ${tokens.length} tokens, ${verseCount} verses, ${lemmas.length} lemmas.`)
+  console.log(
+    `      ${verbTokenCount} verb tokens across ${formTokenCounts.size}/${VERB_FORM_IDS.length} forms; ` +
+      `${rmacTable.length} interned RMAC codes.`,
+  )
   console.log(`Output: ${OUT_DIR}`)
 }
 

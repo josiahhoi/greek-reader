@@ -1,20 +1,24 @@
 import { useState } from 'react'
-import type { CorpusToken, CorpusVerse, LemmaEntry } from '../lib/corpusTypes'
-import { CONCEPTS } from '../data/concepts'
+import type { CorpusToken, CorpusVerse, LemmaEntry, RmacEntry } from '../lib/corpusTypes'
+import { VERB_FORMS } from '../data/verbForms'
 
 function TokenView({
   tok,
   lemma,
   isBlocker,
-  knownConcepts,
+  rmacTable,
+  knownForms,
 }: {
   tok: CorpusToken
   lemma: LemmaEntry
   isBlocker: boolean
-  knownConcepts: ReadonlySet<number>
+  rmacTable: RmacEntry[]
+  knownForms: ReadonlySet<string>
 }) {
   const [open, setOpen] = useState(false)
-  const unknownGrammar = tok.c.filter((c) => !knownConcepts.has(c)).map((c) => CONCEPTS[c])
+  const rmac = rmacTable[tok.r]
+  const form = rmac && rmac.form >= 0 ? VERB_FORMS[rmac.form] : undefined
+  const missingForm = form && !knownForms.has(form.id) ? form : undefined
 
   return (
     <span className="relative inline-block">
@@ -37,10 +41,13 @@ function TokenView({
             {lemma.lemma}
           </p>
           <p className="text-stone-500 dark:text-stone-400">{lemma.gloss}</p>
+          {rmac && (
+            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{rmac.label}</p>
+          )}
           <p className="mt-1 text-xs text-stone-400">in context: “{tok.g}”</p>
-          {unknownGrammar.length > 0 && (
+          {missingForm && (
             <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
-              Not yet known: {unknownGrammar.map((c) => c.label).join(', ')}
+              Verb form not yet known: {missingForm.tense} {missingForm.voice} {missingForm.mood}
             </p>
           )}
           <p className="mt-2 text-xs text-stone-400">Strong's {lemma.strongs}</p>
@@ -54,13 +61,15 @@ export function VerseView({
   verse,
   bookAbbr,
   lemmas,
-  knownConcepts,
+  rmacTable,
+  knownForms,
   blockerIndices,
 }: {
   verse: CorpusVerse
   bookAbbr: string
   lemmas: LemmaEntry[]
-  knownConcepts: ReadonlySet<number>
+  rmacTable: RmacEntry[]
+  knownForms: ReadonlySet<string>
   blockerIndices: ReadonlySet<number>
 }) {
   const [showTranslation, setShowTranslation] = useState(false)
@@ -78,7 +87,8 @@ export function VerseView({
             tok={tok}
             lemma={lemmas[tok.l]}
             isBlocker={blockerIndices.has(i)}
-            knownConcepts={knownConcepts}
+            rmacTable={rmacTable}
+            knownForms={knownForms}
           />
         ))}
       </div>

@@ -1,9 +1,12 @@
-// Ranks verses by how readable they are, given a learner's known lemmas and
-// known grammar concepts. A token "blocks" a verse when its lemma isn't
-// known OR its concept set isn't fully known — failing on both axes still
+// Ranks verses by how readable they are, given a learner's known vocabulary and
+// known verb forms. A token "blocks" a verse when its lemma isn't known OR it's
+// a verb whose form (tense+voice+mood) isn't known — failing on both axes still
 // only counts once, since it's still just one word you can't get past.
+//
+// Non-verbs never block on grammar: cases, genders, pronoun types and the rest
+// are treated as always known (see the gating model in the plan).
 
-import type { BookIndexEntry, CorpusVerse } from './corpusTypes'
+import type { BookIndexEntry, CorpusVerse, RmacEntry } from './corpusTypes'
 
 export interface ScoredVerse {
   bookId: number
@@ -16,16 +19,25 @@ export interface ScoredVerse {
   raw: CorpusVerse
 }
 
-export function scoreVerse(
-  bookId: number,
-  verse: CorpusVerse,
-  knownLemmas: ReadonlySet<number>,
-  knownConcepts: ReadonlySet<number>,
-): ScoredVerse {
+/** Resolves a token's rmac index to its gating verb-form id, or null for non-verbs. */
+function formIdOf(rmacIdx: number, rmacTable: RmacEntry[], verbFormIds: string[]): string | null {
+  const form = rmacTable[rmacIdx]?.form ?? -1
+  return form >= 0 ? verbFormIds[form] : null
+}
+
+export interface ScoringContext {
+  rmacTable: RmacEntry[]
+  verbFormIds: string[]
+  knownLemmas: ReadonlySet<number>
+  knownForms: ReadonlySet<string>
+}
+
+export function scoreVerse(bookId: number, verse: CorpusVerse, ctx: ScoringContext): ScoredVerse {
   const blockerIndices: number[] = []
   verse.t.forEach((tok, i) => {
-    const lemmaKnown = knownLemmas.has(tok.l)
-    const grammarKnown = tok.c.every((c) => knownConcepts.has(c))
+    const lemmaKnown = ctx.knownLemmas.has(tok.l)
+    const formId = formIdOf(tok.r, ctx.rmacTable, ctx.verbFormIds)
+    const grammarKnown = formId === null || ctx.knownForms.has(formId)
     if (!lemmaKnown || !grammarKnown) blockerIndices.push(i)
   })
   return {
@@ -55,8 +67,7 @@ export interface RankOptions {
  */
 export function rankVerses(
   books: Map<number, CorpusVerse[]>,
-  knownLemmas: ReadonlySet<number>,
-  knownConcepts: ReadonlySet<number>,
+  ctx: ScoringContext,
   options: RankOptions,
 ): ScoredVerse[] {
   const { tolerance, minLength = 5, maxLength = 20 } = options
@@ -64,7 +75,7 @@ export function rankVerses(
 
   for (const [bookId, verses] of books) {
     for (const verse of verses) {
-      const s = scoreVerse(bookId, verse, knownLemmas, knownConcepts)
+      const s = scoreVerse(bookId, verse, ctx)
       if (s.blockers <= tolerance) scored.push(s)
     }
   }
@@ -90,8 +101,7 @@ export function rankVerses(
 export function coverageByBook(
   books: Map<number, CorpusVerse[]>,
   bookIndex: BookIndexEntry[],
-  knownLemmas: ReadonlySet<number>,
-  knownConcepts: ReadonlySet<number>,
+  ctx: ScoringContext,
 ): { bookId: number; abbr: string; readableTokens: number; totalTokens: number }[] {
   const abbrById = new Map(bookIndex.map((b) => [b.id, b.abbr]))
   const out: { bookId: number; abbr: string; readableTokens: number; totalTokens: number }[] = []
@@ -102,9 +112,9 @@ export function coverageByBook(
     for (const verse of verses) {
       for (const tok of verse.t) {
         totalTokens++
-        const lemmaKnown = knownLemmas.has(tok.l)
-        const grammarKnown = tok.c.every((c) => knownConcepts.has(c))
-        if (lemmaKnown && grammarKnown) readableTokens++
+        const formId = formIdOf(tok.r, ctx.rmacTable, ctx.verbFormIds)
+        const grammarKnown = formId === null || ctx.knownForms.has(formId)
+        if (ctx.knownLemmas.has(tok.l) && grammarKnown) readableTokens++
       }
     }
     out.push({ bookId, abbr: abbrById.get(bookId) ?? String(bookId), readableTokens, totalTokens })
