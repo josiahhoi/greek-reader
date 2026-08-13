@@ -21,21 +21,37 @@ export interface Profile {
   updatedAt: number
 }
 
+/**
+ * Usernames are case/whitespace-insensitive everywhere (storage key, Firestore
+ * doc id, and the `username` field itself) so "Josiah" and "josiah" are always
+ * the same profile, and so a Firestore rule can check
+ * `request.resource.data.username == <doc id>` without a casing mismatch.
+ */
+export function normalizeUsername(username: string): string {
+  return username.trim().toLowerCase()
+}
+
 export function defaultProfile(username: string): Profile {
   return {
-    username,
+    username: normalizeUsername(username),
     vocabThreshold: 50,
     extraKnownLemmas: [],
     excludedLemmas: [],
     knownConcepts: [],
     tolerance: 1,
     readVerses: [],
-    updatedAt: Date.now(),
+    // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
+    // sync merge's last-write-wins comparison (see mergeProfiles in
+    // src/lib/sync.ts). A never-touched default must always lose to a real
+    // saved profile — local or remote — or a brand-new device would look
+    // "more recent" than another device's actual settings and clobber them
+    // on first sync, just because it happened to load a moment later.
+    updatedAt: 0,
   }
 }
 
 function storageKey(username: string): string {
-  return `greek-reader:profile:${username.trim().toLowerCase()}`
+  return `greek-reader:profile:${normalizeUsername(username)}`
 }
 
 export function loadProfile(username: string): Profile {
@@ -43,15 +59,17 @@ export function loadProfile(username: string): Profile {
   if (!raw) return defaultProfile(username)
   try {
     const parsed = JSON.parse(raw) as Partial<Profile>
-    return { ...defaultProfile(username), ...parsed, username }
+    return { ...defaultProfile(username), ...parsed, username: normalizeUsername(username) }
   } catch {
     return defaultProfile(username)
   }
 }
 
-export function saveProfile(profile: Profile): void {
+/** Persists the profile, stamping `updatedAt`, and returns the exact object saved. */
+export function saveProfile(profile: Profile): Profile {
   const toSave: Profile = { ...profile, updatedAt: Date.now() }
   localStorage.setItem(storageKey(profile.username), JSON.stringify(toSave))
+  return toSave
 }
 
 export function listKnownProfiles(): string[] {

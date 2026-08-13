@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useCorpus } from './hooks/useCorpus'
-import { useProfile } from './hooks/useProfile'
+import { useSyncedProfile } from './hooks/useSyncedProfile'
 import { UsernameGate } from './components/UsernameGate'
 import { GrammarSetup } from './components/GrammarSetup'
 import { VocabSetup } from './components/VocabSetup'
 import { Reader } from './components/Reader'
 import { Progress } from './components/Progress'
+import { SyncIndicator } from './components/SyncIndicator'
 
 const LAST_USER_KEY = 'greek-reader:last-user'
 
@@ -13,7 +14,7 @@ type Tab = 'grammar' | 'vocab' | 'read' | 'progress'
 
 function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: () => void }) {
   const { data: corpus, loading, progress, error } = useCorpus()
-  const [profile, updateProfile] = useProfile(username)
+  const [profile, updateProfile, syncStatus] = useSyncedProfile(username)
   const [tab, setTab] = useState<Tab>('grammar')
 
   if (error) {
@@ -48,12 +49,15 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
       <header className="border-b border-stone-200 dark:border-stone-800">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
           <span className="greek text-lg font-semibold">Ἀναγνώστης</span>
-          <button
-            onClick={onSwitchUser}
-            className="text-sm text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
-          >
-            {username} · switch
-          </button>
+          <div className="flex items-center gap-3">
+            <SyncIndicator status={syncStatus} />
+            <button
+              onClick={onSwitchUser}
+              className="text-sm text-stone-500 hover:text-stone-800 dark:hover:text-stone-200"
+            >
+              {username} · switch
+            </button>
+          </div>
         </div>
         <nav className="mx-auto flex max-w-3xl gap-1 px-4">
           {tabs.map((t) => (
