@@ -3,10 +3,13 @@ import { useScoringContext } from '../hooks/useScoringContext'
 import { useVerbTokenIndex } from '../hooks/useVerbTokenIndex'
 import { groupEligibleByForm, pickCard } from '../lib/quiz'
 import { loadDailyScore, recordAnswer, type DailyScore } from '../lib/dailyScore'
+import { loadFormStats, recordFormAnswer, type FormStats } from '../lib/formStats'
+import { VERB_FORM_IDS } from '../data/verbForms'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import type { VerbTokenRef } from '../lib/quizTypes'
 import { WordDetail } from './WordDetail'
+import { FormStatsGrid } from './FormStatsGrid'
 
 export function Practice({ corpus, profile }: { corpus: CorpusData; profile: Profile }) {
   const verbTokens = useVerbTokenIndex(corpus)
@@ -29,6 +32,7 @@ export function Practice({ corpus, profile }: { corpus: CorpusData; profile: Pro
   const [card, setCard] = useState<VerbTokenRef | null>(() => pickCard(eligibleByForm))
   const [revealed, setRevealed] = useState(false)
   const [score, setScore] = useState<DailyScore>(() => loadDailyScore(profile.username))
+  const [formStats, setFormStats] = useState<FormStats>(() => loadFormStats(profile.username))
 
   function nextCard() {
     setCard((prev) => pickCard(eligibleByForm, prev))
@@ -36,6 +40,9 @@ export function Practice({ corpus, profile }: { corpus: CorpusData; profile: Pro
   }
 
   function grade(correct: boolean) {
+    if (card) {
+      setFormStats(recordFormAnswer(profile.username, VERB_FORM_IDS[card.formIdx], correct))
+    }
     setScore(recordAnswer(profile.username, correct))
     nextCard()
   }
@@ -107,6 +114,8 @@ export function Practice({ corpus, profile }: { corpus: CorpusData; profile: Pro
           )}
         </div>
       )}
+
+      <FormStatsGrid formStats={formStats} />
     </div>
   )
 }
