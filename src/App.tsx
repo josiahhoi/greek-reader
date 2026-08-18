@@ -5,13 +5,14 @@ import { UsernameGate } from './components/UsernameGate'
 import { VerbFormSetup } from './components/VerbFormSetup'
 import { VocabSetup } from './components/VocabSetup'
 import { Reader } from './components/Reader'
+import { ReadersText } from './components/ReadersText'
 import { Practice } from './components/Practice'
 import { Progress } from './components/Progress'
 import { SyncIndicator } from './components/SyncIndicator'
 
 const LAST_USER_KEY = 'greek-reader:last-user'
 
-type Tab = 'grammar' | 'vocab' | 'read' | 'practice' | 'progress'
+type Tab = 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'progress'
 
 function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: () => void }) {
   const { data: corpus, loading, progress, error } = useCorpus()
@@ -42,6 +43,7 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
     { id: 'grammar', label: 'Verb forms' },
     { id: 'vocab', label: 'Vocabulary' },
     { id: 'read', label: 'Read' },
+    { id: 'readers', label: "Reader's NT" },
     { id: 'practice', label: 'Practice' },
     { id: 'progress', label: 'Progress' },
   ]
@@ -61,13 +63,13 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
             </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-3xl gap-1 px-4">
+        <nav className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={
-                'border-b-2 px-3 py-2 text-sm font-medium transition-colors ' +
+                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ' +
                 (tab === t.id
                   ? 'border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100'
                   : 'border-transparent text-stone-400 hover:text-stone-700 dark:hover:text-stone-300')
@@ -87,6 +89,9 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
           <VocabSetup profile={profile} lemmas={corpus.lemmas} onChange={updateProfile} />
         )}
         {tab === 'read' && <Reader corpus={corpus} profile={profile} onChange={updateProfile} />}
+        {tab === 'readers' && (
+          <ReadersText corpus={corpus} profile={profile} onChange={updateProfile} />
+        )}
         {tab === 'practice' && <Practice corpus={corpus} profile={profile} />}
         {tab === 'progress' && <Progress corpus={corpus} profile={profile} />}
       </main>

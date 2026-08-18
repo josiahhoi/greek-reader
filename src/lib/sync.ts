@@ -28,9 +28,10 @@ function union(a: string[], b: string[]): string[] {
  * progress — union them so nothing marked known/read on either side is ever
  * lost, without needing per-field timestamps.
  *
- * Everything else (`vocabThreshold`, `excludedLemmas`, `tolerance`) is
- * current *settings*, not accumulated history, so whichever side has the
- * newer `updatedAt` wins for that whole bundle.
+ * Everything else (`vocabThreshold`, `excludedLemmas`, `tolerance`, and the
+ * Reader's NT settings `readerThreshold`/`readerPersonalized`/`readerBookId`/
+ * `readerChapter`) is current *settings*, not accumulated history, so
+ * whichever side has the newer `updatedAt` wins for that whole bundle.
  */
 export function mergeProfiles(local: Profile, remote: Profile): Profile {
   const settingsSource = local.updatedAt >= remote.updatedAt ? local : remote
@@ -39,6 +40,10 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
     vocabThreshold: settingsSource.vocabThreshold,
     excludedLemmas: settingsSource.excludedLemmas,
     tolerance: settingsSource.tolerance,
+    readerThreshold: settingsSource.readerThreshold,
+    readerPersonalized: settingsSource.readerPersonalized,
+    readerBookId: settingsSource.readerBookId,
+    readerChapter: settingsSource.readerChapter,
     extraKnownLemmas: union(local.extraKnownLemmas, remote.extraKnownLemmas),
     knownVerbForms: union(local.knownVerbForms ?? [], remote.knownVerbForms ?? []),
     readVerses: union(local.readVerses, remote.readVerses),

@@ -18,6 +18,13 @@ export interface Profile {
   tolerance: number
   /** "bookId.chapter.verse" keys the learner has marked read. */
   readVerses: string[]
+  /** Reader's NT: annotate lemmas occurring fewer than this many times in the NT. */
+  readerThreshold: number
+  /** Reader's NT: annotate by known-vocabulary instead of raw frequency. */
+  readerPersonalized: boolean
+  /** Reader's NT: book/chapter last viewed, so it resumes where you left off. */
+  readerBookId: number
+  readerChapter: number
   updatedAt: number
 }
 
@@ -40,6 +47,10 @@ export function defaultProfile(username: string): Profile {
     knownVerbForms: [],
     tolerance: 1,
     readVerses: [],
+    readerThreshold: 30,
+    readerPersonalized: false,
+    readerBookId: 40,
+    readerChapter: 1,
     // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
     // sync merge's last-write-wins comparison (see mergeProfiles in
     // src/lib/sync.ts). A never-touched default must always lose to a real
