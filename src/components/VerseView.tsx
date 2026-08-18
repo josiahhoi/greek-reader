@@ -1,5 +1,6 @@
 import { Fragment, useState } from 'react'
 import type { CorpusToken, CorpusVerse, LemmaEntry, RmacEntry } from '../lib/corpusTypes'
+import { displayAfter } from '../lib/chapters'
 import { WordDetail } from './WordDetail'
 
 function TokenView({
@@ -31,7 +32,7 @@ function TokenView({
       >
         {tok.b}
         {tok.t}
-        {tok.a}
+        {displayAfter(tok.a)}
       </button>
       {open && (
         <div className="absolute left-1/2 top-full z-10 mt-1 w-56 -translate-x-1/2 rounded-lg border border-stone-200 bg-white p-3 text-left text-sm shadow-lg dark:border-stone-700 dark:bg-stone-900">
@@ -58,7 +59,10 @@ export function VerseView({
   blockerIndices: ReadonlySet<number>
 }) {
   const [showTranslation, setShowTranslation] = useState(false)
-  const translation = verse.t.map((tok) => tok.b + tok.s + tok.a).join(' ').trim()
+  const translation = verse.t
+    .map((tok) => tok.b + tok.s + displayAfter(tok.a))
+    .join(' ')
+    .trim()
 
   return (
     <div>
