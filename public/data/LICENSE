@@ -1,0 +1,35 @@
+Data license: CC BY-SA 4.0
+https://creativecommons.org/licenses/by-sa/4.0/
+
+The compiled corpus files in this directory (meta.json, lemmas.json, books-index.json,
+rmac-table.json, form-stats.json, and books/*.json) are an adaptation of:
+
+  OpenGNT — Open Greek New Testament
+  https://github.com/eliranwong/OpenGNT
+  Copyright Eliran Wong and contributors
+  Licensed under CC BY-SA 4.0
+
+OpenGNT itself incorporates and credits several underlying sources, most notably:
+
+  - Robinson's Morphological Analysis Codes (RMAC), used here to derive each token's
+    grammatical parse and verb-form gating category.
+  - Levinsohn clause-ID data, from Stephen H. Levinsohn's discourse analysis of the Greek
+    New Testament.
+  - English glosses drawn in part from the Berean Interlinear Bible / Berean Standard Bible
+    (bereanbible.com).
+
+See the OpenGNT repository (https://github.com/eliranwong/OpenGNT) for the complete list of
+sources and its full notices.
+
+Because CC BY-SA 4.0 is a copyleft ("ShareAlike") license, this adaptation of OpenGNT's data
+is likewise released under CC BY-SA 4.0. You are free to share and adapt these corpus files
+for any purpose, including commercially, provided you give appropriate credit, indicate if
+changes were made, and distribute your contributions under the same license.
+
+This license applies only to the data files in public/data/. It does not apply to this
+project's application source code (see the repository's own LICENSE), which is a separate,
+non-derivative work that merely reads this data at runtime.
+
+Not included: OpenGNT's Chinese-language columns (Chinese Standard Bible text), which are
+licensed CC BY-NC-ND and are incompatible with this project's license — they were excluded
+entirely from the build pipeline and are not present anywhere in this repository.

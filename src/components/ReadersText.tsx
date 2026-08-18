@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import { useScoringContext } from '../hooks/useScoringContext'
 import { useChapters } from '../hooks/useChapters'
-import { chapterKey, type Chapter } from '../lib/chapters'
+import { buildParagraphs, chapterKey, displayAfter, type Chapter } from '../lib/chapters'
 import { BOOKS, BOOK_BY_ID } from '../data/books'
 import { WordDetail } from './WordDetail'
 
@@ -94,6 +94,7 @@ export function ReadersText({
   }
 
   const maxChapter = maxChapterByBook.get(current.bookId) ?? 1
+  const paragraphs = useMemo(() => buildParagraphs(current), [current])
 
   return (
     <div>
@@ -179,78 +180,99 @@ export function ReadersText({
         <p className="greek mb-4 text-center text-sm uppercase tracking-widest text-stone-400">
           {book.greekName}
         </p>
-        <div className="greek text-xl leading-loose text-stone-900 dark:text-stone-100">
-          <span
-            className="float-left mr-2 font-serif text-6xl font-bold leading-[0.8] text-stone-300 dark:text-stone-700"
-            aria-hidden
-          >
-            {current.chapter}
-          </span>
-          {current.verses.map((v) => {
-            const vKey = verseKey(current.bookId, v.c, v.v)
-            const isRead = readSet.has(vKey)
-            return (
-              <span
-                key={vKey}
-                className={isRead ? 'rounded bg-sky-50 dark:bg-sky-950/40' : undefined}
-              >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    toggleVerseRead(vKey)
-                  }}
-                  title={isRead ? 'Mark verse unread' : 'Mark verse read'}
-                  className={
-                    'align-super mr-0.5 text-xs font-semibold ' +
-                    (isRead
-                      ? 'text-sky-600 dark:text-sky-400'
-                      : 'text-stone-400 hover:text-stone-700 dark:hover:text-stone-200')
-                  }
+        <div
+          lang="grc"
+          style={{ hyphens: 'none' }}
+          className="greek text-justify text-xl leading-[1.8] break-words text-stone-900 dark:text-stone-100"
+        >
+          {paragraphs.map((para, pIdx) => (
+            <p key={pIdx} className={pIdx === 0 ? 'm-0' : 'm-0 indent-8'}>
+              {pIdx === 0 && (
+                <span
+                  className="float-left mr-2 font-serif text-6xl font-bold leading-[0.8] text-stone-300 dark:text-stone-700"
+                  aria-hidden
                 >
-                  {v.v}
-                </button>
-                {v.t.map((tok, i) => {
-                  const rare = isRare(tok.l)
-                  const tKey = `${v.v}-${i}`
-                  const content = `${tok.b}${tok.t}${tok.a}`
-                  if (!rare) {
-                    return (
-                      <span key={i} className="px-0.5">
-                        {content}
-                      </span>
-                    )
-                  }
-                  return (
-                    <span key={i} className="relative inline-block">
+                  {current.chapter}
+                </span>
+              )}
+              {para.runs.map((run, runIdx) => {
+                const vKey = verseKey(current.bookId, run.verse.c, run.verse.v)
+                const isRead = readSet.has(vKey)
+                return (
+                  <span
+                    key={runIdx}
+                    className={isRead ? 'rounded bg-sky-50 dark:bg-sky-950/40' : undefined}
+                  >
+                    {runIdx > 0 && ' '}
+                    {run.startsVerse && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation()
-                          setOpenKey((k) => (k === tKey ? null : tKey))
+                          toggleVerseRead(vKey)
                         }}
-                        className="rounded border-b border-dotted border-stone-400 px-0.5 hover:bg-stone-100 dark:border-stone-500 dark:hover:bg-stone-800"
+                        title={isRead ? 'Mark verse unread' : 'Mark verse read'}
+                        className={
+                          'align-super text-xs font-semibold ' +
+                          (isRead
+                            ? 'text-sky-600 dark:text-sky-400'
+                            : 'text-stone-400 hover:text-stone-700 dark:hover:text-stone-200')
+                        }
                       >
-                        {content}
+                        {run.verse.v}
                       </button>
-                      {openKey === tKey && (
-                        <div
-                          onClick={(e) => e.stopPropagation()}
-                          className="absolute left-1/2 top-full z-10 mt-1 w-56 -translate-x-1/2 rounded-lg border border-stone-200 bg-white p-3 text-left text-sm normal-case shadow-lg dark:border-stone-700 dark:bg-stone-900"
-                        >
-                          <WordDetail
-                            lemma={corpus.lemmas[tok.l]}
-                            rmac={corpus.rmacTable[tok.r]}
-                            knownForms={ctx.knownForms}
-                            contextGloss={tok.g}
-                            verseRef={`${book.abbr} ${v.c}:${v.v}`}
-                          />
-                        </div>
-                      )}
-                    </span>
-                  )
-                })}
-              </span>
-            )
-          })}
+                    )}
+                    {run.tokens.map((tok, i) => {
+                      const rare = isRare(tok.l)
+                      const globalIdx = run.startIndex + i
+                      const tKey = `${run.verse.v}-${globalIdx}`
+                      if (!rare) {
+                        return (
+                          <Fragment key={i}>
+                            {i > 0 && ' '}
+                            {tok.b}
+                            {tok.t}
+                            {displayAfter(tok.a)}
+                          </Fragment>
+                        )
+                      }
+                      return (
+                        <Fragment key={i}>
+                          {i > 0 && ' '}
+                          {tok.b}
+                          <span className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOpenKey((k) => (k === tKey ? null : tKey))
+                              }}
+                              className="inline border-b border-dotted border-stone-400 hover:bg-stone-100 dark:border-stone-500 dark:hover:bg-stone-800"
+                            >
+                              {tok.t}
+                            </button>
+                            {openKey === tKey && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-1/2 top-full z-10 mt-1 w-56 -translate-x-1/2 rounded-lg border border-stone-200 bg-white p-3 text-left text-sm normal-case not-italic shadow-lg dark:border-stone-700 dark:bg-stone-900"
+                              >
+                                <WordDetail
+                                  lemma={corpus.lemmas[tok.l]}
+                                  rmac={corpus.rmacTable[tok.r]}
+                                  knownForms={ctx.knownForms}
+                                  contextGloss={tok.g}
+                                  verseRef={`${book.abbr} ${run.verse.c}:${run.verse.v}`}
+                                />
+                              </div>
+                            )}
+                          </span>
+                          {displayAfter(tok.a)}
+                        </Fragment>
+                      )
+                    })}
+                  </span>
+                )
+              })}
+            </p>
+          ))}
         </div>
       </div>
     </div>

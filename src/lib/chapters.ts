@@ -3,7 +3,7 @@
 // reader), this is canonical-order, whole-chapter grouping for continuous
 // reading straight through.
 
-import type { CorpusVerse } from './corpusTypes'
+import type { CorpusToken, CorpusVerse } from './corpusTypes'
 
 export interface Chapter {
   bookId: number
@@ -34,4 +34,73 @@ export function buildChapters(books: Map<number, CorpusVerse[]>): Chapter[] {
   }
 
   return chapters
+}
+
+/** A run of consecutive tokens from one verse that lands inside one paragraph. */
+export interface VerseRun {
+  verse: CorpusVerse
+  /** Index into verse.t of this run's first token. */
+  startIndex: number
+  tokens: CorpusToken[]
+  /** True when this run begins at token 0 — render the superscript verse number here. */
+  startsVerse: boolean
+}
+
+export interface ChapterParagraph {
+  runs: VerseRun[]
+}
+
+/** Strips the paragraph mark itself out of a token's trailing punctuation for display. */
+export function displayAfter(a: string): string {
+  return a.replace(/¶/g, '')
+}
+
+/**
+ * Splits a chapter into paragraphs at every `¶` mark, which is always the last
+ * character of a token's `a` field. A mark can fall mid-verse (~59 times
+ * NT-wide), so a verse's tokens can straddle two paragraphs — that's why a
+ * paragraph holds VerseRuns (one verse's tokens *within* that paragraph)
+ * rather than whole verses.
+ */
+export function buildParagraphs(chapter: Chapter): ChapterParagraph[] {
+  const paragraphs: ChapterParagraph[] = []
+  let runs: VerseRun[] = []
+  let runTokens: CorpusToken[] = []
+  let runStart = 0
+  let runStartsVerse = true
+  let verse: CorpusVerse
+
+  function flushRun() {
+    if (runTokens.length > 0) {
+      runs.push({ verse, startIndex: runStart, tokens: runTokens, startsVerse: runStartsVerse })
+    }
+    runTokens = []
+  }
+
+  function flushParagraph() {
+    flushRun()
+    if (runs.length > 0) paragraphs.push({ runs })
+    runs = []
+  }
+
+  for (const v of chapter.verses) {
+    verse = v
+    runStartsVerse = true
+    runStart = 0
+    runTokens = []
+
+    v.t.forEach((tok, i) => {
+      runTokens.push(tok)
+      if (tok.a.includes('¶')) {
+        flushRun()
+        flushParagraph()
+        runStart = i + 1
+        runStartsVerse = false
+      }
+    })
+    flushRun()
+  }
+  flushParagraph()
+
+  return paragraphs
 }

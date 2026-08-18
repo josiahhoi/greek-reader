@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import type { CorpusToken, CorpusVerse, LemmaEntry, RmacEntry } from '../lib/corpusTypes'
 import { WordDetail } from './WordDetail'
 
@@ -23,7 +23,7 @@ function TokenView({
       <button
         onClick={() => setOpen((o) => !o)}
         className={
-          'greek rounded px-0.5 text-xl transition-colors ' +
+          'greek rounded text-xl transition-colors ' +
           (isBlocker
             ? 'bg-amber-100 text-amber-900 hover:bg-amber-200 dark:bg-amber-900/40 dark:text-amber-200'
             : 'hover:bg-stone-100 dark:hover:bg-stone-800')
@@ -67,14 +67,16 @@ export function VerseView({
       </p>
       <div className="leading-loose">
         {verse.t.map((tok, i) => (
-          <TokenView
-            key={i}
-            tok={tok}
-            lemma={lemmas[tok.l]}
-            isBlocker={blockerIndices.has(i)}
-            rmacTable={rmacTable}
-            knownForms={knownForms}
-          />
+          <Fragment key={i}>
+            {i > 0 && ' '}
+            <TokenView
+              tok={tok}
+              lemma={lemmas[tok.l]}
+              isBlocker={blockerIndices.has(i)}
+              rmacTable={rmacTable}
+              knownForms={knownForms}
+            />
+          </Fragment>
         ))}
       </div>
       <button
