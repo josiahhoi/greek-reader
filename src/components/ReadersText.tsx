@@ -243,7 +243,7 @@ export function ReadersText({
                 return (
                   <span
                     key={runIdx}
-                    className={isRead ? 'rounded bg-sky-50 dark:bg-sky-950/40' : undefined}
+                    className={isRead ? 'rounded bg-sky-100 dark:bg-sky-900/50' : undefined}
                   >
                     {runIdx > 0 && ' '}
                     {run.startsVerse && (
