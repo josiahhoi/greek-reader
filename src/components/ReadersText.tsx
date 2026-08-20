@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import { useScoringContext } from '../hooks/useScoringContext'
@@ -25,6 +25,17 @@ export function ReadersText({
   onChange: (updater: (p: Profile) => Profile) => void
 }) {
   const [openKey, setOpenKey] = useState<string | null>(null)
+
+  // Escape closes the word popover. Bound only while one is open, so the
+  // reader isn't holding a global key listener the whole time it's mounted.
+  useEffect(() => {
+    if (openKey === null) return
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setOpenKey(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [openKey])
 
   const ctx = useScoringContext(corpus, profile)
   const rawChapters = useChapters(corpus)
