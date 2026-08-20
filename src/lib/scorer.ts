@@ -20,7 +20,11 @@ export interface ScoredVerse {
 }
 
 /** Resolves a token's rmac index to its gating verb-form id, or null for non-verbs. */
-function formIdOf(rmacIdx: number, rmacTable: RmacEntry[], verbFormIds: string[]): string | null {
+export function formIdOf(
+  rmacIdx: number,
+  rmacTable: RmacEntry[],
+  verbFormIds: string[],
+): string | null {
   const form = rmacTable[rmacIdx]?.form ?? -1
   return form >= 0 ? verbFormIds[form] : null
 }

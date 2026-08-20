@@ -4,6 +4,8 @@ import type { Profile } from '../lib/profile'
 import { useScoringContext } from '../hooks/useScoringContext'
 import { useChapters } from '../hooks/useChapters'
 import { buildParagraphs, chapterKey, displayAfter, type Chapter } from '../lib/chapters'
+import { formIdOf } from '../lib/scorer'
+import type { CorpusToken } from '../lib/corpusTypes'
 import { BOOKS, BOOK_BY_ID } from '../data/books'
 import { WordDetail } from './WordDetail'
 
@@ -59,18 +61,38 @@ export function ReadersText({
     if (target) goTo(target.bookId, target.chapter)
   }
 
-  function isRare(lemmaId: number): boolean {
+  // Two independent axes, matching how scoreVerse decides a token blocks a
+  // verse: vocabulary (rare, or not in your known set) and grammar (a verb
+  // whose tense/voice/mood you haven't marked known). Either one flags a word.
+  function vocabUnknown(lemmaId: number): boolean {
     return profile.readerPersonalized
       ? !ctx.knownLemmas.has(lemmaId)
       : corpus.lemmas[lemmaId].freq < profile.readerThreshold
   }
 
-  const rareCount = useMemo(() => {
+  function formUnknown(rmacIdx: number): boolean {
+    if (!profile.readerAnnotateForms) return false
+    const formId = formIdOf(rmacIdx, ctx.rmacTable, ctx.verbFormIds)
+    return formId !== null && !ctx.knownForms.has(formId)
+  }
+
+  function shouldAnnotate(tok: CorpusToken): boolean {
+    return vocabUnknown(tok.l) || formUnknown(tok.r)
+  }
+
+  const annotatedCount = useMemo(() => {
     let n = 0
-    for (const v of current.verses) for (const t of v.t) if (isRare(t.l)) n++
+    for (const v of current.verses) for (const t of v.t) if (shouldAnnotate(t)) n++
     return n
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current, profile.readerPersonalized, profile.readerThreshold, ctx.knownLemmas, corpus.lemmas])
+  }, [
+    current,
+    profile.readerPersonalized,
+    profile.readerThreshold,
+    profile.readerAnnotateForms,
+    ctx,
+    corpus.lemmas,
+  ])
 
   const readSet = new Set(profile.readVerses)
   const chapterFullyRead = current.verses.every((v) =>
@@ -170,8 +192,17 @@ export function ReadersText({
             />
             Personalized (words I don't know)
           </label>
+          <label className="flex items-center gap-1.5 text-xs">
+            <input
+              type="checkbox"
+              checked={profile.readerAnnotateForms}
+              onChange={(e) => onChange((p) => ({ ...p, readerAnnotateForms: e.target.checked }))}
+              className="accent-stone-900 dark:accent-stone-100"
+            />
+            Verb forms I haven't learned
+          </label>
           <span className="ml-auto text-xs text-stone-400">
-            {rareCount} word{rareCount === 1 ? '' : 's'} annotated
+            {annotatedCount} word{annotatedCount === 1 ? '' : 's'} annotated
           </span>
         </div>
       </div>
@@ -222,30 +253,27 @@ export function ReadersText({
                       </button>
                     )}
                     {run.tokens.map((tok, i) => {
-                      const rare = isRare(tok.l)
+                      const annotated = shouldAnnotate(tok)
                       const globalIdx = run.startIndex + i
                       const tKey = `${run.verse.v}-${globalIdx}`
-                      if (!rare) {
-                        return (
-                          <Fragment key={i}>
-                            {i > 0 && ' '}
-                            {tok.b}
-                            {tok.t}
-                            {displayAfter(tok.a)}
-                          </Fragment>
-                        )
-                      }
                       return (
                         <Fragment key={i}>
                           {i > 0 && ' '}
                           {tok.b}
                           <span className="relative">
+                            {/* Every word is tappable for its parse; the dotted
+                                underline only marks the ones flagged as unknown. */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setOpenKey((k) => (k === tKey ? null : tKey))
                               }}
-                              className="inline border-b border-dotted border-stone-400 hover:bg-stone-100 dark:border-stone-500 dark:hover:bg-stone-800"
+                              className={
+                                'inline hover:bg-stone-100 dark:hover:bg-stone-800 ' +
+                                (annotated
+                                  ? 'border-b border-dotted border-stone-400 dark:border-stone-500'
+                                  : '')
+                              }
                             >
                               {tok.t}
                             </button>

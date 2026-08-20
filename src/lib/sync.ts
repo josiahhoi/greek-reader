@@ -1,6 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db, ensureSignedIn } from './firebase'
-import { normalizeUsername, type Profile } from './profile'
+import { defaultProfile, normalizeUsername, type Profile } from './profile'
 
 function profileDoc(username: string) {
   return doc(db, 'profiles', normalizeUsername(username))
@@ -9,7 +9,17 @@ function profileDoc(username: string) {
 export async function fetchRemoteProfile(username: string): Promise<Profile | null> {
   await ensureSignedIn()
   const snap = await getDoc(profileDoc(username))
-  return snap.exists() ? (snap.data() as Profile) : null
+  if (!snap.exists()) return null
+  // Spread over the defaults the same way loadProfile does. A document written
+  // by an older build simply won't have fields added since, and casting the
+  // raw data straight to Profile would hand back `undefined` for them — which
+  // then wins the last-write-wins merge whenever the remote is newer, silently
+  // resetting a setting to neither its default nor the user's choice.
+  return {
+    ...defaultProfile(username),
+    ...(snap.data() as Partial<Profile>),
+    username: normalizeUsername(username),
+  }
 }
 
 export async function pushProfile(profile: Profile): Promise<void> {
@@ -42,6 +52,7 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
     tolerance: settingsSource.tolerance,
     readerThreshold: settingsSource.readerThreshold,
     readerPersonalized: settingsSource.readerPersonalized,
+    readerAnnotateForms: settingsSource.readerAnnotateForms,
     readerBookId: settingsSource.readerBookId,
     readerChapter: settingsSource.readerChapter,
     extraKnownLemmas: union(local.extraKnownLemmas, remote.extraKnownLemmas),

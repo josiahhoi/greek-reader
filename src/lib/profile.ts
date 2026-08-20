@@ -22,6 +22,12 @@ export interface Profile {
   readerThreshold: number
   /** Reader's NT: annotate by known-vocabulary instead of raw frequency. */
   readerPersonalized: boolean
+  /**
+   * Reader's NT: also annotate verbs whose tense/voice/mood you haven't marked
+   * known. Independent of the vocabulary axis above — the two are separate
+   * kinds of "I can't read this", exactly as the scorer already treats them.
+   */
+  readerAnnotateForms: boolean
   /** Reader's NT: book/chapter last viewed, so it resumes where you left off. */
   readerBookId: number
   readerChapter: number
@@ -49,6 +55,7 @@ export function defaultProfile(username: string): Profile {
     readVerses: [],
     readerThreshold: 30,
     readerPersonalized: false,
+    readerAnnotateForms: true,
     readerBookId: 40,
     readerChapter: 1,
     // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
