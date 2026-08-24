@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useScoringContext } from '../hooks/useScoringContext'
 import { useVerbTokenIndex } from '../hooks/useVerbTokenIndex'
+import { bump } from '../lib/activity'
+import { todayKey } from '../lib/dates'
 import { groupEligibleByForm, pickCard } from '../lib/quiz'
 import { loadDailyScore, recordAnswer, type DailyScore } from '../lib/dailyScore'
 import { loadFormStats, recordFormAnswer, type FormStats } from '../lib/formStats'
@@ -11,7 +13,15 @@ import type { VerbTokenRef } from '../lib/quizTypes'
 import { WordDetail } from './WordDetail'
 import { FormStatsGrid } from './FormStatsGrid'
 
-export function Practice({ corpus, profile }: { corpus: CorpusData; profile: Profile }) {
+export function Practice({
+  corpus,
+  profile,
+  onChange,
+}: {
+  corpus: CorpusData
+  profile: Profile
+  onChange: (updater: (p: Profile) => Profile) => void
+}) {
   const verbTokens = useVerbTokenIndex(corpus)
   const ctx = useScoringContext(corpus, profile)
 
@@ -44,6 +54,9 @@ export function Practice({ corpus, profile }: { corpus: CorpusData; profile: Pro
       setFormStats(recordFormAnswer(profile.username, VERB_FORM_IDS[card.formIdx], correct))
     }
     setScore(recordAnswer(profile.username, correct))
+    // formStats and dailyScore stay local-only; the heatmap counter is on the
+    // synced profile, so a parsing session shows up on every device.
+    onChange((p) => ({ ...p, activity: bump(p.activity, 'p', 1, todayKey()) }))
     nextCard()
   }
 

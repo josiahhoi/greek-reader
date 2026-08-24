@@ -6,14 +6,12 @@ import { useChapters } from '../hooks/useChapters'
 import { buildParagraphs, chapterKey, displayAfter, type Chapter } from '../lib/chapters'
 import { formIdOf } from '../lib/scorer'
 import type { CorpusToken } from '../lib/corpusTypes'
+import { markRead, unmarkRead, verseKey } from '../lib/readTracking'
+import { todayKey } from '../lib/dates'
 import { BOOKS, BOOK_BY_ID } from '../data/books'
 import { WordDetail } from './WordDetail'
 
 const THRESHOLDS = [5, 10, 15, 20, 30, 50]
-
-function verseKey(bookId: number, chapter: number, verse: number): string {
-  return `${bookId}.${chapter}.${verse}`
-}
 
 export function ReadersText({
   corpus,
@@ -112,18 +110,13 @@ export function ReadersText({
 
   function toggleVerseRead(key: string) {
     onChange((p) =>
-      p.readVerses.includes(key)
-        ? { ...p, readVerses: p.readVerses.filter((k) => k !== key) }
-        : { ...p, readVerses: [...p.readVerses, key] },
+      p.readVerses.includes(key) ? unmarkRead(p, key) : markRead(p, [key], todayKey()),
     )
   }
 
   function markChapterRead() {
-    onChange((p) => {
-      const set = new Set(p.readVerses)
-      for (const v of current.verses) set.add(verseKey(current.bookId, v.c, v.v))
-      return { ...p, readVerses: [...set] }
-    })
+    const keys = current.verses.map((v) => verseKey(current.bookId, v.c, v.v))
+    onChange((p) => markRead(p, keys, todayKey()))
   }
 
   const maxChapter = maxChapterByBook.get(current.bookId) ?? 1

@@ -1,3 +1,5 @@
+import { bump } from '../lib/activity'
+import { todayKey } from '../lib/dates'
 import {
   MOOD_ORDER,
   TENSE_ORDER,
@@ -34,11 +36,18 @@ export function VerbFormSetup({
   function setForms(ids: string[], value: boolean) {
     onChange((p) => {
       const set = new Set(p.knownVerbForms)
+      let newlyLearned = 0
       for (const id of ids) {
-        if (value) set.add(id)
-        else set.delete(id)
+        if (value) {
+          if (!set.has(id)) newlyLearned++
+          set.add(id)
+        } else set.delete(id)
       }
-      return { ...p, knownVerbForms: [...set] }
+      return {
+        ...p,
+        knownVerbForms: [...set],
+        activity: bump(p.activity, 'g', newlyLearned, todayKey()),
+      }
     })
   }
 

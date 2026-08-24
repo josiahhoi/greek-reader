@@ -4,6 +4,7 @@
 // later is a matter of replacing loadProfile/saveProfile's bodies — the shape
 // callers see doesn't need to change.
 
+import { backfillFromIntroduced, type ActivityLog } from './activity'
 import type { SrsDeck } from './srs'
 
 export interface Profile {
@@ -41,6 +42,19 @@ export interface Profile {
   srs: SrsDeck
   /** Vocabulary flashcards: cap on new cards introduced per day. */
   srsNewPerDay: number
+  /**
+   * Home heatmap: per-day activity counters, 'YYYY-MM-DD' -> DayActivity.
+   * Merged per day per counter by max (see mergeActivityLogs) and serialized
+   * as a JSON string at the Firestore boundary, like `srs`.
+   */
+  activity: ActivityLog
+  /**
+   * When each verse was first read, "bookId.chapter.verse" -> 'YYYY-MM-DD'.
+   * Write-once per verse, so it merges by earliest-wins and is fully
+   * idempotent — the same trick buildQueue uses with SrsCard.introduced,
+   * rather than a counter that would need an additive merge.
+   */
+  readLog: Record<string, string>
   updatedAt: number
 }
 
@@ -70,6 +84,8 @@ export function defaultProfile(username: string): Profile {
     readerChapter: 1,
     srs: {},
     srsNewPerDay: 10,
+    activity: {},
+    readLog: {},
     // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
     // sync merge's last-write-wins comparison (see mergeProfiles in
     // src/lib/sync.ts). A never-touched default must always lose to a real
@@ -119,16 +135,32 @@ export function loadProfile(username: string): Profile {
   if (!raw) return defaultProfile(username)
   try {
     const { cleaned, didStrip } = stripLegacyFields(JSON.parse(raw) as Record<string, unknown>)
-    const profile: Profile = {
+    const loaded: Profile = {
       ...defaultProfile(username),
       ...(cleaned as Partial<Profile>),
       username: normalizeUsername(username),
     }
+
+    // Seed the heatmap from the one slice of history that predates it. Only on
+    // a log that has never recorded anything, so it can't run twice and can't
+    // overwrite real activity.
+    const needsBackfill =
+      Object.keys(loaded.activity ?? {}).length === 0 &&
+      Object.keys(loaded.srs ?? {}).length > 0
+    const profile: Profile = needsBackfill
+      ? {
+          ...loaded,
+          activity: backfillFromIntroduced(
+            loaded.activity,
+            Object.values(loaded.srs).map((c) => c.introduced),
+          ),
+        }
+      : loaded
     // Persist the migration immediately rather than waiting for the next edit
     // or a successful sync — otherwise a profile that's only ever read keeps
     // the dead key forever, and an offline/failed first sync leaves it there
     // indefinitely.
-    if (didStrip) saveProfile(profile)
+    if (didStrip || needsBackfill) saveProfile(profile)
     return profile
   } catch {
     return defaultProfile(username)

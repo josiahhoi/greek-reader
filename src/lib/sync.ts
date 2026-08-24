@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db, ensureSignedIn } from './firebase'
+import { EMPTY_DAY, type ActivityLog, type DayActivity } from './activity'
 import { defaultProfile, normalizeUsername, type Profile } from './profile'
 import { isSafeCardKey, type SrsDeck } from './srs'
 
@@ -21,18 +22,18 @@ function profileDoc(username: string) {
  * The tradeoff is that the deck can't be queried server-side — which costs
  * nothing here, because every read loads the whole profile anyway.
  */
-function encodeDeck(deck: SrsDeck): string {
-  return JSON.stringify(deck ?? {})
+function encodeMap(map: object | undefined): string {
+  return JSON.stringify(map ?? {})
 }
 
-function decodeDeck(raw: unknown): SrsDeck {
-  if (raw && typeof raw === 'object') return raw as SrsDeck // pre-encoding documents
-  if (typeof raw !== 'string') return {}
+function decodeMap<T extends object>(raw: unknown): T {
+  if (raw && typeof raw === 'object') return raw as T // pre-encoding documents
+  if (typeof raw !== 'string') return {} as T
   try {
     const parsed = JSON.parse(raw) as unknown
-    return parsed && typeof parsed === 'object' ? (parsed as SrsDeck) : {}
+    return parsed && typeof parsed === 'object' ? (parsed as T) : ({} as T)
   } catch {
-    return {}
+    return {} as T
   }
 }
 
@@ -45,18 +46,29 @@ export async function fetchRemoteProfile(username: string): Promise<Profile | nu
   // raw data straight to Profile would hand back `undefined` for them — which
   // then wins the last-write-wins merge whenever the remote is newer, silently
   // resetting a setting to neither its default nor the user's choice.
-  const data = snap.data() as Partial<Profile> & { srs?: unknown }
+  const data = snap.data() as Partial<Profile> & {
+    srs?: unknown
+    activity?: unknown
+    readLog?: unknown
+  }
   return {
     ...defaultProfile(username),
     ...(data as Partial<Profile>),
-    srs: decodeDeck(data.srs),
+    srs: decodeMap<SrsDeck>(data.srs),
+    activity: decodeMap<ActivityLog>(data.activity),
+    readLog: decodeMap<Record<string, string>>(data.readLog),
     username: normalizeUsername(username),
   }
 }
 
 export async function pushProfile(profile: Profile): Promise<void> {
   await ensureSignedIn()
-  await setDoc(profileDoc(profile.username), { ...profile, srs: encodeDeck(profile.srs) })
+  await setDoc(profileDoc(profile.username), {
+    ...profile,
+    srs: encodeMap(profile.srs),
+    activity: encodeMap(profile.activity),
+    readLog: encodeMap(profile.readLog),
+  })
 }
 
 function union(a: string[], b: string[]): string[] {
@@ -94,17 +106,81 @@ export function mergeSrsDecks(local: SrsDeck | undefined, remote: SrsDeck | unde
 }
 
 /**
- * Merges a local and remote profile for the same username. Three rules:
+ * Fourth merge rule: per-day activity counters.
+ *
+ * None of the first three fit. Union is for sets, not numbers. Whole-bundle
+ * LWW would throw away a whole day's work done on the losing device. Summing
+ * is the intuitive answer and is *wrong*: merges re-run on every sync, so
+ * a + b would be added again on the next reconcile and the heatmap would
+ * inflate without bound.
+ *
+ * So: per day, per counter, take the max. That's a max-register join —
+ * idempotent, commutative and associative like every other rule here, so
+ * re-merging is free. The cost is that two devices studying the same day
+ * report the larger rather than the sum. That under-reports, which is the
+ * right direction to be wrong for a habit tracker: it can never invent work
+ * you didn't do. It also self-corrects, because once the devices sync each
+ * one's counter is raised to the merged value and subsequent grades build on
+ * that.
+ */
+export function mergeActivityLogs(
+  local: ActivityLog | undefined,
+  remote: ActivityLog | undefined,
+): ActivityLog {
+  const out: ActivityLog = { ...(local ?? {}) }
+  for (const [day, counts] of Object.entries(remote ?? {})) {
+    const mine = out[day]
+    if (!mine) {
+      out[day] = counts
+      continue
+    }
+    const merged = { ...EMPTY_DAY }
+    for (const key of Object.keys(EMPTY_DAY) as (keyof DayActivity)[]) {
+      merged[key] = Math.max(mine[key] ?? 0, counts[key] ?? 0)
+    }
+    out[day] = merged
+  }
+  return out
+}
+
+/**
+ * Fifth rule, and the simplest: when each verse was first read.
+ *
+ * Write-once per key, so "earliest wins" is all it takes — and because the
+ * value never changes after the first write, this is idempotent for free.
+ * This is why verses use a dated log rather than a counter: the count for any
+ * day falls out of it, with no additive merge needed anywhere.
+ */
+export function mergeReadLogs(
+  local: Record<string, string> | undefined,
+  remote: Record<string, string> | undefined,
+): Record<string, string> {
+  const out: Record<string, string> = { ...(local ?? {}) }
+  for (const [verse, day] of Object.entries(remote ?? {})) {
+    const mine = out[verse]
+    if (!mine || day < mine) out[verse] = day
+  }
+  return out
+}
+
+/**
+ * Merges a local and remote profile for the same username. Five rules:
  *
  * 1. `readVerses`, `knownVerbForms`, and `extraKnownLemmas` are cumulative
  *    progress — union them so nothing marked known/read on either side is ever
  *    lost, without needing per-field timestamps.
  * 2. `srs` is per-card mutable state — merged card by card, newest review wins
  *    (see mergeSrsDecks).
- * 3. Everything else (`vocabThreshold`, `excludedLemmas`, `tolerance`, the
+ * 3. `activity` is per-day counters — merged per day per counter by max
+ *    (see mergeActivityLogs).
+ * 4. `readLog` is write-once per verse — earliest date wins (see mergeReadLogs).
+ * 5. Everything else (`vocabThreshold`, `excludedLemmas`, `tolerance`, the
  *    Reader's NT settings, and `srsNewPerDay`) is current *settings*, not
  *    accumulated history, so whichever side has the newer `updatedAt` wins for
  *    that whole bundle.
+ *
+ * Every rule is idempotent, commutative and associative, so a merge can be
+ * re-run any number of times without drift.
  */
 export function mergeProfiles(local: Profile, remote: Profile): Profile {
   const settingsSource = local.updatedAt >= remote.updatedAt ? local : remote
@@ -120,6 +196,8 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
     readerChapter: settingsSource.readerChapter,
     srsNewPerDay: settingsSource.srsNewPerDay,
     srs: mergeSrsDecks(local.srs, remote.srs),
+    activity: mergeActivityLogs(local.activity, remote.activity),
+    readLog: mergeReadLogs(local.readLog, remote.readLog),
     extraKnownLemmas: union(local.extraKnownLemmas, remote.extraKnownLemmas),
     knownVerbForms: union(local.knownVerbForms ?? [], remote.knownVerbForms ?? []),
     readVerses: union(local.readVerses, remote.readVerses),

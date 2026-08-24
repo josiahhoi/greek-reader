@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
+import { bump } from '../lib/activity'
 import { deriveKnownLemmas } from '../lib/deriveKnown'
 import { useLemmaExamples } from '../hooks/useLemmaExamples'
 import { displayAfter } from '../lib/chapters'
@@ -72,7 +73,7 @@ export function Flashcards({
     onChange((p) => {
       const deck: SrsDeck = { ...(p.srs ?? {}) }
       deck[lemma.lemma] = next
-      return { ...p, srs: deck }
+      return { ...p, srs: deck, activity: bump(p.activity, 'f', 1, today) }
     })
     // Maturity isn't written anywhere — deriveKnownLemmas reads the interval
     // directly — so this is purely to tell the learner it happened.
@@ -92,6 +93,7 @@ export function Flashcards({
       ...p,
       extraKnownLemmas: [...new Set([...p.extraKnownLemmas, lemma.lemma])],
       excludedLemmas: p.excludedLemmas.filter((l) => l !== lemma.lemma),
+      activity: bump(p.activity, 'k', 1, today),
     }))
     setQueue((q) => q.slice(1))
     setRevealed(false)

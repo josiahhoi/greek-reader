@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useCorpus } from './hooks/useCorpus'
 import { useSyncedProfile } from './hooks/useSyncedProfile'
 import { UsernameGate } from './components/UsernameGate'
+import { Home } from './components/Home'
 import { VerbFormSetup } from './components/VerbFormSetup'
 import { VocabSetup } from './components/VocabSetup'
 import { Reader } from './components/Reader'
@@ -13,12 +14,12 @@ import { SyncIndicator } from './components/SyncIndicator'
 
 const LAST_USER_KEY = 'greek-reader:last-user'
 
-type Tab = 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'flashcards' | 'progress'
+type Tab = 'home' | 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'flashcards' | 'progress'
 
 function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: () => void }) {
   const { data: corpus, loading, progress, error } = useCorpus()
   const [profile, updateProfile, syncStatus] = useSyncedProfile(username)
-  const [tab, setTab] = useState<Tab>('grammar')
+  const [tab, setTab] = useState<Tab>('home')
 
   if (error) {
     return (
@@ -41,6 +42,7 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
   }
 
   const tabs: { id: Tab; label: string }[] = [
+    { id: 'home', label: 'Home' },
     { id: 'grammar', label: 'Verb forms' },
     { id: 'vocab', label: 'Vocabulary' },
     { id: 'read', label: 'Read' },
@@ -84,6 +86,7 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
       </header>
 
       <main className="mx-auto max-w-3xl px-4 py-6">
+        {tab === 'home' && <Home corpus={corpus} profile={profile} />}
         {tab === 'grammar' && (
           <VerbFormSetup profile={profile} formStats={corpus.formStats} onChange={updateProfile} />
         )}
@@ -94,7 +97,9 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
         {tab === 'readers' && (
           <ReadersText corpus={corpus} profile={profile} onChange={updateProfile} />
         )}
-        {tab === 'practice' && <Practice corpus={corpus} profile={profile} />}
+        {tab === 'practice' && (
+          <Practice corpus={corpus} profile={profile} onChange={updateProfile} />
+        )}
         {tab === 'flashcards' && (
           <Flashcards corpus={corpus} profile={profile} onChange={updateProfile} />
         )}

@@ -4,13 +4,11 @@ import type { Profile } from '../lib/profile'
 import { useScoringContext } from '../hooks/useScoringContext'
 import { usePassages } from '../hooks/usePassages'
 import { rankPassages, type ScoredPassage } from '../lib/passages'
+import { markRead, unmarkRead, verseKey } from '../lib/readTracking'
+import { todayKey } from '../lib/dates'
 import { VerseView } from './VerseView'
 
 const PAGE_SIZE = 8
-
-function verseKey(bookId: number, chapter: number, verse: number): string {
-  return `${bookId}.${chapter}.${verse}`
-}
 
 function formatPassageRef(bookAbbr: string, passage: ScoredPassage): string {
   const first = passage.verses[0]
@@ -45,19 +43,16 @@ export function Reader({
   )
 
   function markVerse(key: string) {
-    onChange((p) => (p.readVerses.includes(key) ? p : { ...p, readVerses: [...p.readVerses, key] }))
+    onChange((p) => markRead(p, [key], todayKey()))
   }
 
   function unmarkVerse(key: string) {
-    onChange((p) => ({ ...p, readVerses: p.readVerses.filter((k) => k !== key) }))
+    onChange((p) => unmarkRead(p, key))
   }
 
   function markPassage(passage: ScoredPassage) {
-    onChange((p) => {
-      const set = new Set(p.readVerses)
-      for (const v of passage.verses) set.add(verseKey(passage.bookId, v.chapter, v.verse))
-      return { ...p, readVerses: [...set] }
-    })
+    const keys = passage.verses.map((v) => verseKey(passage.bookId, v.chapter, v.verse))
+    onChange((p) => markRead(p, keys, todayKey()))
   }
 
   return (

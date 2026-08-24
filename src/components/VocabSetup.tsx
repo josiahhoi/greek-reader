@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import type { LemmaEntry } from '../lib/corpusTypes'
 import type { Profile } from '../lib/profile'
+import { bump } from '../lib/activity'
+import { todayKey } from '../lib/dates'
 import { isLemmaKnown } from '../lib/deriveKnown'
 
 const TIERS = [100, 50, 30, 20, 15, 10, 5, 1]
@@ -52,7 +54,14 @@ export function VocabSetup({
         nextExcluded.delete(l.lemma)
         nextExtra.add(l.lemma)
       }
-      return { ...p, extraKnownLemmas: [...nextExtra], excludedLemmas: [...nextExcluded] }
+      // Only count learning a word, not un-learning one.
+      const learned = nextExtra.size > new Set(p.extraKnownLemmas).size ? 1 : 0
+      return {
+        ...p,
+        extraKnownLemmas: [...nextExtra],
+        excludedLemmas: [...nextExcluded],
+        activity: bump(p.activity, 'k', learned, todayKey()),
+      }
     })
   }
 
