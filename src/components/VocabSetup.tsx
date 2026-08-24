@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { LemmaEntry } from '../lib/corpusTypes'
 import type { Profile } from '../lib/profile'
+import { isLemmaKnown } from '../lib/deriveKnown'
 
 const TIERS = [100, 50, 30, 20, 15, 10, 5, 1]
 
@@ -21,9 +22,6 @@ export function VocabSetup({
     return out
   }, [lemmas])
 
-  const extra = new Set(profile.extraKnownLemmas)
-  const excluded = new Set(profile.excludedLemmas)
-
   const searchResults = useMemo(() => {
     if (!search.trim()) return []
     const q = search.trim().toLowerCase()
@@ -33,19 +31,23 @@ export function VocabSetup({
   }, [search, lemmas])
 
   function isKnown(l: LemmaEntry): boolean {
-    if (excluded.has(l.lemma)) return false
-    return l.freq >= profile.vocabThreshold || extra.has(l.lemma)
+    return isLemmaKnown(profile, l)
   }
 
   function toggleLemma(l: LemmaEntry) {
     onChange((p) => {
       const nextExtra = new Set(p.extraKnownLemmas)
       const nextExcluded = new Set(p.excludedLemmas)
-      const currentlyKnown = isKnown(l)
-      if (currentlyKnown) {
-        // Turning off: if it's above threshold, must exclude explicitly.
+      if (isLemmaKnown(p, l)) {
+        // Turning off. Dropping it from extraKnownLemmas is not enough on its
+        // own: that array is union-merged across devices, so a removal alone
+        // gets resurrected by the next sync. And the word may be known for a
+        // reason that has nothing to do with that array — the frequency
+        // threshold, or a mature flashcard. So whenever it would still count as
+        // known without the manual entry, record an explicit exclusion, which
+        // is last-write-wins and therefore actually propagates.
         nextExtra.delete(l.lemma)
-        if (l.freq >= p.vocabThreshold) nextExcluded.add(l.lemma)
+        if (isLemmaKnown({ ...p, extraKnownLemmas: [] }, l)) nextExcluded.add(l.lemma)
       } else {
         nextExcluded.delete(l.lemma)
         nextExtra.add(l.lemma)

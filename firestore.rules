@@ -1,0 +1,37 @@
+// Firestore security rules for the greek-reader project.
+//
+// These are DEPLOYED BY HAND: paste this file's contents into
+// Firebase console -> Build -> Firestore Database -> Rules -> Publish.
+// Nothing in the build pipeline reads or applies this file — it is committed so
+// the deployed policy is reviewable and recoverable in version control instead
+// of existing only as text pasted into a console.
+//
+// Design note: anonymous auth means anyone who loads the site can sign in, so
+// `request.auth != null` is not a real authorization boundary — any signed-in
+// client can read or write any username's profile. That is the intended
+// "no passwords, high-trust, single user" design recorded in the README. The
+// rules' actual job is keeping the raw API off the open internet, not gating
+// access between people using the app.
+//
+// The read and write conditions must stay SEPARATE. `request.resource` only
+// exists on writes, so folding the username check into a combined
+// `allow read, write:` silently denies every read — this was verified against
+// the live project, where the same token that successfully wrote a document
+// got 403 reading it back.
+//
+// Subcollections are deliberately not matched. All state — including the
+// spaced-repetition deck, which is stored as a JSON string field to stay under
+// Firestore's 40,000 index-entries-per-document limit — lives in the single
+// profiles/{username} document, so no `{document=**}` recursive match is
+// needed. Adding a subcollection later would require extending these rules.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /profiles/{username} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.data.username == username;
+    }
+  }
+}

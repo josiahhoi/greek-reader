@@ -6,19 +6,12 @@
 // doesn't need. See the plan for the full rationale.
 
 import { normalizeUsername } from './profile'
+import { todayKey } from './dates'
 
 export interface DailyScore {
   date: string // 'YYYY-MM-DD', local time
   correct: number
   total: number
-}
-
-function todayKey(): string {
-  const d = new Date()
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
 }
 
 function storageKey(username: string): string {

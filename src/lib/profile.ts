@@ -4,6 +4,8 @@
 // later is a matter of replacing loadProfile/saveProfile's bodies — the shape
 // callers see doesn't need to change.
 
+import type { SrsDeck } from './srs'
+
 export interface Profile {
   username: string
   /** Corpus-frequency threshold: lemmas occurring at least this often count as known. */
@@ -31,6 +33,14 @@ export interface Profile {
   /** Reader's NT: book/chapter last viewed, so it resumes where you left off. */
   readerBookId: number
   readerChapter: number
+  /**
+   * Vocabulary flashcards: per-lemma spaced-repetition state, keyed by lemma
+   * string. Merged by its own third rule (see mergeSrsDecks in sync.ts) and
+   * serialized as a JSON string at the Firestore boundary — see pushProfile.
+   */
+  srs: SrsDeck
+  /** Vocabulary flashcards: cap on new cards introduced per day. */
+  srsNewPerDay: number
   updatedAt: number
 }
 
@@ -58,6 +68,8 @@ export function defaultProfile(username: string): Profile {
     readerAnnotateForms: true,
     readerBookId: 40,
     readerChapter: 1,
+    srs: {},
+    srsNewPerDay: 10,
     // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the
     // sync merge's last-write-wins comparison (see mergeProfiles in
     // src/lib/sync.ts). A never-touched default must always lose to a real

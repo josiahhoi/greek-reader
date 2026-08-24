@@ -7,12 +7,13 @@ import { VocabSetup } from './components/VocabSetup'
 import { Reader } from './components/Reader'
 import { ReadersText } from './components/ReadersText'
 import { Practice } from './components/Practice'
+import { Flashcards } from './components/Flashcards'
 import { Progress } from './components/Progress'
 import { SyncIndicator } from './components/SyncIndicator'
 
 const LAST_USER_KEY = 'greek-reader:last-user'
 
-type Tab = 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'progress'
+type Tab = 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'flashcards' | 'progress'
 
 function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: () => void }) {
   const { data: corpus, loading, progress, error } = useCorpus()
@@ -45,6 +46,7 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
     { id: 'read', label: 'Read' },
     { id: 'readers', label: "Reader's NT" },
     { id: 'practice', label: 'Practice' },
+    { id: 'flashcards', label: 'Flashcards' },
     { id: 'progress', label: 'Progress' },
   ]
 
@@ -93,6 +95,9 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
           <ReadersText corpus={corpus} profile={profile} onChange={updateProfile} />
         )}
         {tab === 'practice' && <Practice corpus={corpus} profile={profile} />}
+        {tab === 'flashcards' && (
+          <Flashcards corpus={corpus} profile={profile} onChange={updateProfile} />
+        )}
         {tab === 'progress' && <Progress corpus={corpus} profile={profile} />}
       </main>
     </div>
