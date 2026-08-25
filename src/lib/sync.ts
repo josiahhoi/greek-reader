@@ -195,6 +195,7 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
     readerBookId: settingsSource.readerBookId,
     readerChapter: settingsSource.readerChapter,
     srsNewPerDay: settingsSource.srsNewPerDay,
+    srsMinFreq: settingsSource.srsMinFreq,
     srs: mergeSrsDecks(local.srs, remote.srs),
     activity: mergeActivityLogs(local.activity, remote.activity),
     readLog: mergeReadLogs(local.readLog, remote.readLog),

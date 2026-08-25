@@ -43,6 +43,14 @@ export interface Profile {
   /** Vocabulary flashcards: cap on new cards introduced per day. */
   srsNewPerDay: number
   /**
+   * Vocabulary flashcards: the deck covers lemmas occurring at least this many
+   * times, most frequent first. Deliberately separate from `vocabThreshold` —
+   * that one says what you can read without a gloss, which is a weaker claim
+   * than being able to recall the word, and using it here hid the commonest
+   * vocabulary from the deck entirely. 1 means every lemma in the corpus.
+   */
+  srsMinFreq: number
+  /**
    * Home heatmap: per-day activity counters, 'YYYY-MM-DD' -> DayActivity.
    * Merged per day per counter by max (see mergeActivityLogs) and serialized
    * as a JSON string at the Firestore boundary, like `srs`.
@@ -84,6 +92,7 @@ export function defaultProfile(username: string): Profile {
     readerChapter: 1,
     srs: {},
     srsNewPerDay: 10,
+    srsMinFreq: 1,
     activity: {},
     readLog: {},
     // Deliberately 0 (epoch), not Date.now(): this timestamp feeds the

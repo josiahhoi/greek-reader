@@ -66,33 +66,45 @@ const lemmas = [
   { lemma: 'alpha', freq: 100 }, { lemma: 'beta', freq: 90 }, { lemma: 'gamma', freq: 80 },
   { lemma: 'delta', freq: 70 }, { lemma: 'eps', freq: 60 },
 ]
-const known = new Set<number>([0])           // 'alpha' already known
+const known = new Set<string>(['alpha'])     // hand-marked "I already know this"
 const deck: SrsDeck = {
   gamma: { ...newCard('2026-08-20'), due: '2026-08-20', reps: 3, interval: 5, reviewed: 5 },
   delta: { ...newCard('2026-08-22'), due: '2026-08-22', reps: 0, interval: 0, reviewed: 9 },
 }
-const q = buildQueue(lemmas, known, deck, 10, T)
+const q = buildQueue(lemmas, known, deck, 10, 1, T)
 check('due cards come before new', q.queue.slice(0, 2).every((i) => ['gamma', 'delta'].includes(lemmas[i].lemma)), q.queue.map(i=>lemmas[i].lemma).join(','))
 check('most overdue first (gamma 08-20 before delta 08-22)', lemmas[q.queue[0]].lemma === 'gamma')
-check('new cards by desc freq, known excluded', lemmas[q.queue[2]].lemma === 'beta' && lemmas[q.queue[3]].lemma === 'eps', q.queue.map(i=>lemmas[i].lemma).join(','))
-check('known lemma never offered as new', !q.queue.some((i) => lemmas[i].lemma === 'alpha'))
+check('new cards by desc freq, hand-known excluded', lemmas[q.queue[2]].lemma === 'beta' && lemmas[q.queue[3]].lemma === 'eps', q.queue.map(i=>lemmas[i].lemma).join(','))
+check('hand-known lemma never offered as new', !q.queue.some((i) => lemmas[i].lemma === 'alpha'))
 check('counts: 1 review + 1 learning', q.counts.review === 1 && q.counts.learning === 1, JSON.stringify(q.counts))
+
+// --- deck range (minFreq) ---
+// Regression test for the reported bug: the deck used to be gated by
+// vocabThreshold via deriveKnownLemmas, so raising the threshold silently hid
+// the commonest words. buildQueue no longer sees a threshold at all.
+const noneKnown = new Set<string>()
+const qAll = buildQueue(lemmas, noneKnown, {}, 10, 1, T)
+check('minFreq 1 offers the highest-frequency lemma first', lemmas[qAll.queue[0]].lemma === 'alpha', qAll.queue.map(i=>lemmas[i].lemma).join(','))
+check('minFreq 1 offers every lemma', qAll.queue.length === lemmas.length, String(qAll.queue.length))
+const q80 = buildQueue(lemmas, noneKnown, {}, 10, 80, T)
+check('minFreq 80 keeps only the three >=80x lemmas', q80.queue.length === 3, q80.queue.map(i=>lemmas[i].lemma).join(','))
+check('minFreq 80 excludes the 70x lemma', !q80.queue.some((i) => lemmas[i].lemma === 'delta'))
 
 // newPerDay cap + introduced-today derivation
 const deck2: SrsDeck = { beta: { ...newCard(T), introduced: T } }
-const q2 = buildQueue(lemmas, known, deck2, 2, T)
+const q2 = buildQueue(lemmas, known, deck2, 2, 1, T)
 check('introducedToday derived = 1', q2.counts.introducedToday === 1, String(q2.counts.introducedToday))
 check('newRemaining = 2-1 = 1', q2.counts.newRemaining === 1, String(q2.counts.newRemaining))
 const freshOnly = q2.queue.filter((i) => !(lemmas[i].lemma in deck2))
 check('cap honoured: only 1 new offered', freshOnly.length === 1, String(freshOnly.length))
-const q2again = buildQueue(lemmas, known, deck2, 2, T)
+const q2again = buildQueue(lemmas, known, deck2, 2, 1, T)
 check('rebuilding same day does not grow the count', q2again.counts.introducedToday === 1)
 check('existing card never re-offered as new', !freshOnly.some((i) => lemmas[i].lemma === 'beta'))
 
 // a card whose lemma became known stays on schedule
 const matureDeck: SrsDeck = { eps: { ...newCard(T), due: T, interval: 30, reps: 6 } }
-const knownIncludingEps = new Set<number>([0, 4])
-const q3 = buildQueue(lemmas, knownIncludingEps, matureDeck, 10, T)
+const knownIncludingEps = new Set<string>(['alpha', 'eps'])
+const q3 = buildQueue(lemmas, knownIncludingEps, matureDeck, 10, 1, T)
 check('mature card still reviewed despite being known', q3.queue.some((i) => lemmas[i].lemma === 'eps'))
 
 // requeue

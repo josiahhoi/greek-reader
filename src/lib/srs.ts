@@ -161,8 +161,20 @@ export interface BuiltQueue {
  * Builds today's study queue as lemma indices.
  *
  * Order is overdue reviews oldest-first (ties broken by corpus frequency), then
- * new cards by descending frequency — the "next frequency band" rule, so the
- * highest-value unknown words come first.
+ * new cards by descending frequency, so the highest-value words come first.
+ *
+ * A lemma becomes a new card when it has no card yet, occurs at least
+ * `minFreq` times, and isn't in `handKnown`.
+ *
+ * `handKnown` is `extraKnownLemmas` — words the learner explicitly said they
+ * know, which is where the "I already know this" button writes. It is
+ * deliberately the *only* knowledge signal that removes a word from the deck.
+ * In particular `vocabThreshold` does not: it declares what you can read
+ * without a gloss, which is a different claim from being able to recall a word
+ * cold, and letting it gate the deck meant a threshold of 20 silently hid the
+ * 637 most common words from ever being drilled. Nor does SRS maturity, which
+ * removes a word anyway by virtue of it having a card; nor `excludedLemmas`,
+ * which says you *don't* know a word and so should certainly be drilled.
  *
  * The daily new-card allowance is enforced by counting cards whose `introduced`
  * date is today rather than by keeping a counter. That matters for sync: a
@@ -172,9 +184,10 @@ export interface BuiltQueue {
  */
 export function buildQueue(
   lemmas: { lemma: string; freq: number }[],
-  knownLemmas: ReadonlySet<number>,
+  handKnown: ReadonlySet<string>,
   deck: SrsDeck,
   newPerDay: number,
+  minFreq: number,
   today: string = todayKey(),
 ): BuiltQueue {
   let introducedToday = 0
@@ -198,9 +211,8 @@ export function buildQueue(
       }
       continue
     }
-    // New cards come only from lemmas the learner does not know and has never
-    // been shown before.
-    if (!knownLemmas.has(i)) freshPool.push(i)
+    // New cards: anything in range that hasn't been hand-marked as known.
+    if (lemmas[i].freq >= minFreq && !handKnown.has(lemmas[i].lemma)) freshPool.push(i)
   }
 
   dueIdx.sort((a, b) => {

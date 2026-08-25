@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useScoringContext } from '../hooks/useScoringContext'
 import { useVerbTokenIndex } from '../hooks/useVerbTokenIndex'
 import { bump } from '../lib/activity'
@@ -59,6 +59,36 @@ export function Practice({
     onChange((p) => ({ ...p, activity: bump(p.activity, 'p', 1, todayKey()) }))
     nextCard()
   }
+
+  // Same keymap as the Flashcards tab — the interaction is identical, so the
+  // two shouldn't drift. Space must be prevented or the page scrolls.
+  useEffect(() => {
+    if (!card) return
+    function onKeyDown(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault()
+        if (revealed) grade(true)
+        else setRevealed(true)
+        return
+      }
+      if (!revealed) return
+      if (e.key === '1') {
+        e.preventDefault()
+        grade(false)
+      } else if (e.key === '2') {
+        e.preventDefault()
+        grade(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card, revealed])
 
   const pct = score.total > 0 ? Math.round((score.correct / score.total) * 100) : null
 

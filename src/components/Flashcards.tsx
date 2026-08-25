@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import { bump } from '../lib/activity'
-import { deriveKnownLemmas } from '../lib/deriveKnown'
 import { useLemmaExamples } from '../hooks/useLemmaExamples'
 import { displayAfter } from '../lib/chapters'
 import { startOfTodayMs, todayKey } from '../lib/dates'
@@ -17,6 +16,16 @@ import {
 
 const NEW_PER_DAY_CHOICES = [5, 10, 20, 40]
 
+/** Deck floor: the deck covers lemmas at or above the chosen frequency. 1 = everything. */
+const MIN_FREQ_CHOICES: { value: number; label: string }[] = [
+  { value: 1, label: 'all' },
+  { value: 50, label: '≥50×' },
+  { value: 30, label: '≥30×' },
+  { value: 20, label: '≥20×' },
+  { value: 10, label: '≥10×' },
+  { value: 5, label: '≥5×' },
+]
+
 export function Flashcards({
   corpus,
   profile,
@@ -27,10 +36,9 @@ export function Flashcards({
   onChange: (updater: (p: Profile) => Profile) => void
 }) {
   const today = todayKey()
-  const knownLemmas = useMemo(
-    () => deriveKnownLemmas(profile, corpus.lemmas),
-    [profile, corpus.lemmas],
-  )
+  // Only "I already know this" removes a word from the deck. vocabThreshold
+  // deliberately doesn't — see the buildQueue doc comment.
+  const handKnown = useMemo(() => new Set(profile.extraKnownLemmas), [profile.extraKnownLemmas])
   const examples = useLemmaExamples(corpus)
 
   // The queue is state, not a memo: a memo keyed on `profile` would rebuild
@@ -39,14 +47,30 @@ export function Flashcards({
   // pass over 5,395 lemmas, so rebuilding is free and nothing needs to survive
   // the unmount that happens on every tab switch.
   const [queue, setQueue] = useState<number[]>(
-    () => buildQueue(corpus.lemmas, knownLemmas, profile.srs ?? {}, profile.srsNewPerDay, today).queue,
+    () =>
+      buildQueue(
+        corpus.lemmas,
+        handKnown,
+        profile.srs ?? {},
+        profile.srsNewPerDay,
+        profile.srsMinFreq,
+        today,
+      ).queue,
   )
   const [revealed, setRevealed] = useState(false)
   const [justLearned, setJustLearned] = useState<string | null>(null)
 
   const counts = useMemo(
-    () => buildQueue(corpus.lemmas, knownLemmas, profile.srs ?? {}, profile.srsNewPerDay, today).counts,
-    [corpus.lemmas, knownLemmas, profile.srs, profile.srsNewPerDay, today],
+    () =>
+      buildQueue(
+        corpus.lemmas,
+        handKnown,
+        profile.srs ?? {},
+        profile.srsNewPerDay,
+        profile.srsMinFreq,
+        today,
+      ).counts,
+    [corpus.lemmas, handKnown, profile.srs, profile.srsNewPerDay, profile.srsMinFreq, today],
   )
 
   const reviewedToday = useMemo(() => {
@@ -54,9 +78,9 @@ export function Flashcards({
     return Object.values(profile.srs ?? {}).filter((c) => c.reviewed >= since).length
   }, [profile.srs])
 
-  function rebuild() {
+  function rebuild(minFreq = profile.srsMinFreq, newPerDay = profile.srsNewPerDay) {
     setQueue(
-      buildQueue(corpus.lemmas, knownLemmas, profile.srs ?? {}, profile.srsNewPerDay, today).queue,
+      buildQueue(corpus.lemmas, handKnown, profile.srs ?? {}, newPerDay, minFreq, today).queue,
     )
     setRevealed(false)
     setJustLearned(null)
@@ -102,8 +126,44 @@ export function Flashcards({
 
   function setNewPerDay(n: number) {
     onChange((p) => ({ ...p, srsNewPerDay: n }))
-    setQueue(buildQueue(corpus.lemmas, knownLemmas, profile.srs ?? {}, n, today).queue)
+    rebuild(profile.srsMinFreq, n)
   }
+
+  function setMinFreq(n: number) {
+    onChange((p) => ({ ...p, srsMinFreq: n }))
+    rebuild(n, profile.srsNewPerDay)
+  }
+
+  // Anki's keys: space/enter reveals then passes, 1 fails, 2 passes. Bound only
+  // while a card is on screen. Space must be prevented or the page scrolls out
+  // from under the card on every reveal.
+  useEffect(() => {
+    if (!lemma) return
+    function onKeyDown(e: KeyboardEvent) {
+      const el = e.target as HTMLElement | null
+      const tag = el?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || el?.isContentEditable) return
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+
+      if (e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault()
+        if (revealed) grade(true)
+        else setRevealed(true)
+        return
+      }
+      if (!revealed) return
+      if (e.key === '1') {
+        e.preventDefault()
+        grade(false)
+      } else if (e.key === '2') {
+        e.preventDefault()
+        grade(true)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lemma, revealed, head, card])
 
   const nextDue = useMemo(() => {
     const future = Object.values(profile.srs ?? {})
@@ -114,7 +174,17 @@ export function Flashcards({
   }, [profile.srs, today])
 
   const deckSize = Object.keys(profile.srs ?? {}).length
-  const unknownRemain = corpus.lemmas.length - knownLemmas.size
+  // Words the deck could still draw on: in range, not hand-known, no card yet.
+  const inRange = useMemo(
+    () => corpus.lemmas.filter((l) => l.freq >= profile.srsMinFreq && !handKnown.has(l.lemma)).length,
+    [corpus.lemmas, profile.srsMinFreq, handKnown],
+  )
+  const unlearnedRemain = useMemo(() => {
+    const deck = profile.srs ?? {}
+    return corpus.lemmas.filter(
+      (l) => l.freq >= profile.srsMinFreq && !handKnown.has(l.lemma) && !deck[l.lemma],
+    ).length
+  }, [corpus.lemmas, profile.srsMinFreq, handKnown, profile.srs])
 
   return (
     <div>
@@ -149,12 +219,33 @@ export function Flashcards({
         </span>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-stone-500 dark:text-stone-400">
+        <span className="uppercase tracking-wide text-stone-400">Drill words down to</span>
+        {MIN_FREQ_CHOICES.map((choice) => (
+          <button
+            key={choice.value}
+            onClick={() => setMinFreq(choice.value)}
+            className={
+              'rounded-full px-2 py-0.5 font-medium ' +
+              (profile.srsMinFreq === choice.value
+                ? 'bg-stone-900 text-white dark:bg-stone-100 dark:text-stone-900'
+                : 'bg-stone-100 text-stone-500 hover:bg-stone-200 dark:bg-stone-800 dark:text-stone-400 dark:hover:bg-stone-700')
+            }
+          >
+            {choice.label}
+          </button>
+        ))}
+        <span className="ml-auto text-stone-400">
+          {inRange.toLocaleString()} word{inRange === 1 ? '' : 's'} in range
+        </span>
+      </div>
+
       {!lemma ? (
         <EmptyState
           deckSize={deckSize}
-          unknownRemain={unknownRemain}
+          unlearnedRemain={unlearnedRemain}
           nextDue={nextDue}
-          onRefresh={rebuild}
+          onRefresh={() => rebuild()}
         />
       ) : (
         <div className="rounded-lg border border-stone-200 p-8 text-center dark:border-stone-800">
@@ -237,18 +328,19 @@ export function Flashcards({
 
 function EmptyState({
   deckSize,
-  unknownRemain,
+  unlearnedRemain,
   nextDue,
   onRefresh,
 }: {
   deckSize: number
-  unknownRemain: number
+  unlearnedRemain: number
   nextDue?: string
   onRefresh: () => void
 }) {
   let message: string
-  if (unknownRemain === 0) {
-    message = 'Nothing left to learn — every lemma in the NT counts as known vocabulary.'
+  if (unlearnedRemain === 0) {
+    message =
+      'Every word in range already has a card. Widen the range above to bring in rarer words.'
   } else if (deckSize === 0) {
     message =
       "No cards yet. Today's new-card allowance is spent or set to zero — raise it above to start a deck."
