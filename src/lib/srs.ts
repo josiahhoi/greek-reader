@@ -39,6 +39,12 @@ export const MIN_EASE = 1.3
 export const SECOND_INTERVAL_DAYS = 6
 /** Retained this long and the word counts as known vocabulary (Anki's convention). */
 export const MATURE_INTERVAL_DAYS = 21
+/**
+ * Interval ceiling. Without one, `round(interval * ease)` compounds a card out
+ * to 595 days and beyond, which in practice means never seeing it again. Capped
+ * here a word you know still comes back about twice a year to prove you do.
+ */
+export const MAX_INTERVAL_DAYS = 180
 /** Passes in a row before a correct answer starts healing ease. See nextEase. */
 export const EASE_RECOVERY_AFTER_REPS = 3
 /** How far back in the current session a missed card is re-inserted. */
@@ -81,7 +87,8 @@ export function newCard(today: string = todayKey()): SrsCard {
  * Applies one grade and returns the new card state. `prev` undefined means this
  * is the card's first ever answer.
  *
- * A pass steps the interval 1 day -> 6 days -> round(interval * ease). A fail
+ * A pass steps the interval 1 day -> 6 days -> round(interval * ease), never
+ * past MAX_INTERVAL_DAYS. A fail
  * resets the streak and leaves the card due *today*, which is the entire
  * relearning mechanism: no sub-day timestamps, no learning-step counter, no
  * separate queue to persist. Because the queue is rebuilt from `due <= today`,
@@ -118,12 +125,14 @@ export function gradeCard(
   }
 
   const reps = base.reps + 1
-  const interval =
+  const interval = Math.min(
+    MAX_INTERVAL_DAYS,
     reps === 1
       ? 1
       : reps === 2
         ? SECOND_INTERVAL_DAYS
-        : Math.max(1, Math.round(base.interval * base.ease))
+        : Math.max(1, Math.round(base.interval * base.ease)),
+  )
 
   return {
     ...base,
@@ -138,6 +147,34 @@ export function gradeCard(
 /** A card held this long counts as learned — see deriveKnownLemmas. */
 export function isMature(card: SrsCard | undefined): boolean {
   return card !== undefined && card.interval >= MATURE_INTERVAL_DAYS
+}
+
+/**
+ * The card written by "I already know this": mature on the spot, so the word
+ * counts as known everywhere deriveKnownLemmas looks, and parked at the ceiling
+ * so it still comes back once to be confirmed rather than vanishing.
+ *
+ * Knowledge is sourced from the card itself rather than from extraKnownLemmas
+ * for the reason deriveKnownLemmas gives: that list is union-merged across
+ * devices and so can never be taken back, whereas a card that gets failed at its
+ * eventual review resets its interval and honestly stops counting as known.
+ *
+ * `reps` is lifted to the ease-recovery streak for two reasons: a later pass then
+ * takes the round(interval * ease) branch and stays at the ceiling instead of
+ * restarting at 1 day, and buildQueue reads the card as a review rather than as
+ * something still being learned. Ease, lapses and the introduced date carry over,
+ * so hand-marking a word already in the deck keeps what the deck learned about it.
+ */
+export function knownCard(prev: SrsCard | undefined, now: Date = new Date()): SrsCard {
+  const today = todayKey(now)
+  const base = prev ?? newCard(today)
+  return {
+    ...base,
+    interval: MAX_INTERVAL_DAYS,
+    due: addDays(today, MAX_INTERVAL_DAYS),
+    reps: Math.max(base.reps, EASE_RECOVERY_AFTER_REPS),
+    reviewed: now.getTime(),
+  }
 }
 
 export interface QueueCounts {
@@ -166,9 +203,9 @@ export interface BuiltQueue {
  * A lemma becomes a new card when it has no card yet, occurs at least
  * `minFreq` times, and isn't in `handKnown`.
  *
- * `handKnown` is `extraKnownLemmas` — words the learner explicitly said they
- * know, which is where the "I already know this" button writes. It is
- * deliberately the *only* knowledge signal that removes a word from the deck.
+ * `handKnown` is `extraKnownLemmas` — words ticked off by hand in the Vocabulary
+ * tab. It is deliberately the *only* knowledge signal that removes a word from
+ * the deck.
  * In particular `vocabThreshold` does not: it declares what you can read
  * without a gloss, which is a different claim from being able to recall a word
  * cold, and letting it gate the deck meant a threshold of 20 silently hid the
@@ -177,7 +214,11 @@ export interface BuiltQueue {
  * which says you *don't* know a word and so should certainly be drilled.
  *
  * The daily new-card allowance is enforced by counting cards whose `introduced`
- * date is today rather than by keeping a counter. That matters for sync: a
+ * date is today *and that aren't already mature*. The maturity part is what keeps
+ * "I already know this" from eating the allowance: that button writes a card
+ * mature on day one, and a word known on sight never occupied a learning slot.
+ * Ordinary grading can't reach the 21-day mark on a card's first day, so nothing
+ * genuinely being learned escapes the count. That matters for sync: a
  * counter would need an additive merge rule (the very reason dailyScore and
  * formStats were never synced), whereas a derived count falls straight out of
  * the per-card merge and cannot drift or double-count across devices.
@@ -192,7 +233,7 @@ export function buildQueue(
 ): BuiltQueue {
   let introducedToday = 0
   for (const [key, card] of Object.entries(deck)) {
-    if (isSafeCardKey(key) && card.introduced === today) introducedToday++
+    if (isSafeCardKey(key) && card.introduced === today && !isMature(card)) introducedToday++
   }
 
   const dueIdx: number[] = []

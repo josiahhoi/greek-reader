@@ -1,7 +1,8 @@
 import { todayKey, addDays } from '../src/lib/dates'
 import {
-  gradeCard, isMature, buildQueue, requeue, newCard,
-  INITIAL_EASE, MIN_EASE, MATURE_INTERVAL_DAYS, RELEARN_GAP, type SrsDeck,
+  gradeCard, isMature, knownCard, buildQueue, requeue, newCard,
+  INITIAL_EASE, MIN_EASE, MATURE_INTERVAL_DAYS, MAX_INTERVAL_DAYS, RELEARN_GAP,
+  EASE_RECOVERY_AFTER_REPS, type SrsDeck,
 } from '../src/lib/srs'
 import { mergeSrsDecks } from '../src/lib/sync'
 
@@ -49,6 +50,15 @@ check('repeated fails clamp ease at 1.3 exactly', e.ease === MIN_EASE, String(e.
 let r = newCard(T)
 for (let i = 0; i < 20; i++) r = gradeCard(r, true, D(T))
 check('20 passes: ease never exceeds 2.5', r.ease <= INITIAL_EASE, String(r.ease))
+check('20 passes: interval never exceeds the ceiling', r.interval === MAX_INTERVAL_DAYS, String(r.interval))
+
+// --- interval ceiling ---
+const atCap = gradeCard({ ...newCard(T), interval: MAX_INTERVAL_DAYS, reps: 5 }, true, D(T))
+check('pass at the ceiling stays at the ceiling', atCap.interval === MAX_INTERVAL_DAYS, String(atCap.interval))
+check('pass at the ceiling schedules the ceiling out', atCap.due === addDays(T, MAX_INTERVAL_DAYS), atCap.due)
+const overCap = gradeCard({ ...newCard(T), interval: 400, reps: 9 }, true, D(T))
+check('a legacy over-cap interval clamps on its next pass', overCap.interval === MAX_INTERVAL_DAYS, String(overCap.interval))
+check('ceiling does not disturb the early steps', gradeCard(undefined, true, D(T)).interval === 1)
 
 // monotonic growth
 let g = newCard(T); const seq: number[] = []
@@ -60,6 +70,19 @@ check('isMature false below 21d', !isMature({ ...newCard(T), interval: 20 }))
 check('isMature true at 21d', isMature({ ...newCard(T), interval: MATURE_INTERVAL_DAYS }))
 check('isMature false for undefined', !isMature(undefined))
 check('lapse un-matures', !isMature(gradeCard({ ...newCard(T), interval: 30, reps: 5 }, false, D(T))))
+
+// --- "I already know this" ---
+const k = knownCard(undefined, D(T))
+check('knownCard is mature at once', isMature(k), String(k.interval))
+check('knownCard sits at the ceiling', k.interval === MAX_INTERVAL_DAYS, String(k.interval))
+check('knownCard is due the ceiling out, not today', k.due === addDays(T, MAX_INTERVAL_DAYS), k.due)
+check('knownCard carries a streak, so buildQueue reads it as a review', k.reps >= EASE_RECOVERY_AFTER_REPS, String(k.reps))
+const kPassed = gradeCard(k, true, D(addDays(T, MAX_INTERVAL_DAYS)))
+check('passing a known card keeps it at the ceiling', kPassed.interval === MAX_INTERVAL_DAYS, String(kPassed.interval))
+const kFailed = gradeCard(k, false, D(T))
+check('failing a known card un-knows it', !isMature(kFailed) && kFailed.due === T, `i=${kFailed.interval} due=${kFailed.due}`)
+const kPrior = knownCard({ ...newCard('2026-08-01'), ease: 1.8, reps: 2, lapses: 3 }, D(T))
+check('knownCard keeps a prior card ease/introduced/lapses', kPrior.ease === 1.8 && kPrior.introduced === '2026-08-01' && kPrior.lapses === 3, JSON.stringify(kPrior))
 
 // --- queue ---
 const lemmas = [
@@ -100,6 +123,16 @@ check('cap honoured: only 1 new offered', freshOnly.length === 1, String(freshOn
 const q2again = buildQueue(lemmas, known, deck2, 2, 1, T)
 check('rebuilding same day does not grow the count', q2again.counts.introducedToday === 1)
 check('existing card never re-offered as new', !freshOnly.some((i) => lemmas[i].lemma === 'beta'))
+
+// A word marked known today is not a word taken on to learn, so it must not
+// spend the daily new-card allowance the way an ordinary new card does.
+const deck3: SrsDeck = { beta: { ...newCard(T), introduced: T }, gamma: knownCard(undefined, D(T)) }
+const q4 = buildQueue(lemmas, noneKnown, deck3, 2, 1, T)
+check('hand-known card does not spend the new allowance', q4.counts.introducedToday === 1, String(q4.counts.introducedToday))
+check('a genuine new card still spends it', q4.counts.newRemaining === 1, String(q4.counts.newRemaining))
+check('hand-known card is not due today', !q4.queue.some((i) => lemmas[i].lemma === 'gamma'), q4.queue.map(i=>lemmas[i].lemma).join(','))
+const q5 = buildQueue(lemmas, noneKnown, deck3, 2, 1, addDays(T, MAX_INTERVAL_DAYS))
+check('hand-known card comes back at the ceiling', q5.queue.some((i) => lemmas[i].lemma === 'gamma'), q5.queue.map(i=>lemmas[i].lemma).join(','))
 
 // a card whose lemma became known stays on schedule
 const matureDeck: SrsDeck = { eps: { ...newCard(T), due: T, interval: 30, reps: 6 } }

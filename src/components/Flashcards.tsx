@@ -9,8 +9,10 @@ import { BOOK_BY_ID } from '../data/books'
 import {
   buildQueue,
   gradeCard,
+  knownCard,
   requeue,
   MATURE_INTERVAL_DAYS,
+  MAX_INTERVAL_DAYS,
   type SrsDeck,
 } from '../lib/srs'
 
@@ -36,8 +38,9 @@ export function Flashcards({
   onChange: (updater: (p: Profile) => Profile) => void
 }) {
   const today = todayKey()
-  // Only "I already know this" removes a word from the deck. vocabThreshold
-  // deliberately doesn't — see the buildQueue doc comment.
+  // Only ticking a word off in the Vocabulary tab keeps it out of the deck
+  // entirely. vocabThreshold deliberately doesn't — see the buildQueue doc
+  // comment — and "I already know this" leaves a card behind on purpose.
   const handKnown = useMemo(() => new Set(profile.extraKnownLemmas), [profile.extraKnownLemmas])
   const examples = useLemmaExamples(corpus)
 
@@ -58,7 +61,12 @@ export function Flashcards({
       ).queue,
   )
   const [revealed, setRevealed] = useState(false)
-  const [justLearned, setJustLearned] = useState<string | null>(null)
+  // What the banner under the card is announcing, if anything: a card that just
+  // crossed the maturity line by being graded, or one hand-marked as known.
+  const [justLearned, setJustLearned] = useState<{
+    lemma: string
+    kind: 'mature' | 'known'
+  } | null>(null)
 
   const counts = useMemo(
     () =>
@@ -103,25 +111,37 @@ export function Flashcards({
     // directly — so this is purely to tell the learner it happened.
     setJustLearned(
       passed && next.interval >= MATURE_INTERVAL_DAYS && (card?.interval ?? 0) < MATURE_INTERVAL_DAYS
-        ? lemma.lemma
+        ? { lemma: lemma.lemma, kind: 'mature' }
         : null,
     )
     setQueue((q) => (passed ? q.slice(1) : requeue(q, head)))
     setRevealed(false)
   }
 
-  /** "I already know this" — genuine user intent, so this one does write extraKnownLemmas. */
+  /**
+   * "I already know this" — writes a card that is mature immediately and parked at
+   * the interval ceiling, so the word counts as known right away and still comes
+   * back once at the cap. Knownness therefore rides on the card, not on
+   * extraKnownLemmas, which no sync can ever take back; the excludedLemmas filter
+   * stays because an exclusion outranks maturity in isLemmaKnown and would
+   * otherwise make the click a no-op.
+   */
   function markAlreadyKnown() {
     if (!lemma) return
-    onChange((p) => ({
-      ...p,
-      extraKnownLemmas: [...new Set([...p.extraKnownLemmas, lemma.lemma])],
-      excludedLemmas: p.excludedLemmas.filter((l) => l !== lemma.lemma),
-      activity: bump(p.activity, 'k', 1, today),
-    }))
+    const next = knownCard(card)
+    onChange((p) => {
+      const deck: SrsDeck = { ...(p.srs ?? {}) }
+      deck[lemma.lemma] = next
+      return {
+        ...p,
+        srs: deck,
+        excludedLemmas: p.excludedLemmas.filter((l) => l !== lemma.lemma),
+        activity: bump(p.activity, 'k', 1, today),
+      }
+    })
     setQueue((q) => q.slice(1))
     setRevealed(false)
-    setJustLearned(null)
+    setJustLearned({ lemma: lemma.lemma, kind: 'known' })
   }
 
   function setNewPerDay(n: number) {
@@ -318,8 +338,10 @@ export function Flashcards({
 
       {justLearned && (
         <p className="mt-3 rounded-md bg-emerald-50 p-3 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
-          <span className="greek">{justLearned}</span> reached a {MATURE_INTERVAL_DAYS}-day interval
-          — it now counts as known vocabulary in Read and Reader&apos;s NT.
+          <span className="greek">{justLearned.lemma}</span>{' '}
+          {justLearned.kind === 'mature'
+            ? `reached a ${MATURE_INTERVAL_DAYS}-day interval — it now counts as known vocabulary in Read and Reader's NT.`
+            : `now counts as known vocabulary in Read and Reader's NT. It comes back in ${MAX_INTERVAL_DAYS} days to be confirmed.`}
         </p>
       )}
     </div>
