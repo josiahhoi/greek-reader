@@ -5,6 +5,10 @@ import {
   EASE_RECOVERY_AFTER_REPS, type SrsDeck,
 } from '../src/lib/srs'
 import { mergeSrsDecks } from '../src/lib/sync'
+import { markKnownAbove, migrateKnownVocab, toggleKnown } from '../src/lib/knownVocab'
+import { isLemmaKnown } from '../src/lib/deriveKnown'
+import { defaultProfile, type Profile } from '../src/lib/profile'
+import type { LemmaEntry } from '../src/lib/corpusTypes'
 
 let fails = 0
 function check(label: string, ok: boolean, detail = '') {
@@ -144,6 +148,44 @@ check('mature card still reviewed despite being known', q3.queue.some((i) => lem
 const rq = requeue([1, 2, 3, 4, 5, 6, 7, 8, 9], 1)
 check(`requeue puts head back ${RELEARN_GAP} places`, rq[RELEARN_GAP] === 1, rq.join(','))
 check('requeue on short queue puts head last', requeue([1, 2], 1).join(',') === '2,1', requeue([1, 2], 1).join(','))
+
+// --- marking vocabulary known ---
+const vocab: LemmaEntry[] = [
+  { lemma: 'alpha', gloss: 'a', strongs: 'G1', freq: 100 },
+  { lemma: 'beta', gloss: 'b', strongs: 'G2', freq: 60 },
+  { lemma: 'gamma', gloss: 'c', strongs: 'G3', freq: 10 },
+]
+const base: Profile = { ...defaultProfile('tester'), srs: {} }
+
+const marked = markKnownAbove(base, vocab, 50, D(T))
+check('marks every lemma at or above the tier', Object.keys(marked.srs).sort().join(',') === 'alpha,beta', Object.keys(marked.srs).join(','))
+check('leaves rarer lemmas alone', marked.srs.gamma === undefined)
+check('marked words count as known', vocab.slice(0, 2).every((l) => isLemmaKnown(marked, l)))
+check('marked words are mature at the ceiling', isMature(marked.srs.alpha) && marked.srs.alpha.interval === MAX_INTERVAL_DAYS)
+check('marked words are due at the ceiling, not today', marked.srs.alpha.due === addDays(T, MAX_INTERVAL_DAYS), marked.srs.alpha.due)
+check('bulk marking does not score activity', Object.keys(marked.activity ?? {}).length === 0, JSON.stringify(marked.activity))
+
+const partly: Profile = { ...base, srs: { alpha: { ...newCard(T), interval: 6, reps: 2, reviewed: 7 } } }
+const remarked = markKnownAbove(partly, vocab, 50, D(T))
+check('a card already being learned is not overwritten', remarked.srs.alpha.interval === 6, String(remarked.srs.alpha.interval))
+check('re-running the same tier is a no-op', markKnownAbove(marked, vocab, 50, D(T)) === marked)
+
+const unknown = toggleKnown(marked, vocab[0], D(T))
+check('un-marking puts the word back in the deck, due today', unknown.srs.alpha.due === T && unknown.srs.alpha.interval === 0, JSON.stringify(unknown.srs.alpha))
+check('un-marked word no longer counts as known', !isLemmaKnown(unknown, vocab[0]))
+const reknown = toggleKnown(unknown, vocab[0], D(T))
+check('marking it known again re-matures it', isLemmaKnown(reknown, vocab[0]) && reknown.srs.alpha.interval === MAX_INTERVAL_DAYS)
+check('marking a single word does score activity', (reknown.activity[T]?.k ?? 0) === 1, JSON.stringify(reknown.activity[T]))
+
+// legacy vocabThreshold -> cards
+const legacy: Profile = { ...base, vocabThreshold: 50 }
+check('a legacy profile knows by threshold', isLemmaKnown(legacy, vocab[1]))
+const migrated = migrateKnownVocab(legacy, vocab, D(T))
+check('migration drops the threshold field', migrated.vocabThreshold === undefined)
+check('migration keeps the same words known', isLemmaKnown(migrated, vocab[0]) && isLemmaKnown(migrated, vocab[1]) && !isLemmaKnown(migrated, vocab[2]))
+check('migration writes them as cards', Object.keys(migrated.srs).sort().join(',') === 'alpha,beta', Object.keys(migrated.srs).join(','))
+check('migration is idempotent', migrateKnownVocab(migrated, vocab, D(T)) === migrated)
+check('a profile with no threshold is untouched', migrateKnownVocab(base, vocab, D(T)) === base)
 
 // --- merge ---
 const A: SrsDeck = { x: { ...newCard(T), reviewed: 100 }, y: { ...newCard(T), reviewed: 200 } }

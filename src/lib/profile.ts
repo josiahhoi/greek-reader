@@ -10,7 +10,14 @@ import type { SrsDeck } from './srs'
 export interface Profile {
   username: string
   /** Corpus-frequency threshold: lemmas occurring at least this often count as known. */
-  vocabThreshold: number
+  /**
+   * Legacy: "every lemma this frequent counts as known", the setting the old
+   * Vocabulary tab wrote. Superseded by marking words known in the deck, which
+   * is one source of truth and lets a missed review un-know a word. Still
+   * honoured while present so nobody's known vocabulary drops out from under
+   * them; migrateKnownVocab converts it into cards and clears it.
+   */
+  vocabThreshold?: number
   /** Lemma strings marked known individually, on top of the frequency threshold. */
   extraKnownLemmas: string[]
   /** Lemma strings marked explicitly NOT known, overriding the frequency threshold. */
@@ -79,7 +86,6 @@ export function normalizeUsername(username: string): string {
 export function defaultProfile(username: string): Profile {
   return {
     username: normalizeUsername(username),
-    vocabThreshold: 50,
     extraKnownLemmas: [],
     excludedLemmas: [],
     knownVerbForms: [],

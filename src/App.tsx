@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useCorpus } from './hooks/useCorpus'
+import { migrateKnownVocab } from './lib/knownVocab'
 import { useSyncedProfile } from './hooks/useSyncedProfile'
 import { UsernameGate } from './components/UsernameGate'
 import { Home } from './components/Home'
 import { VerbFormSetup } from './components/VerbFormSetup'
-import { VocabSetup } from './components/VocabSetup'
 import { Reader } from './components/Reader'
 import { ReadersText } from './components/ReadersText'
 import { Practice } from './components/Practice'
@@ -13,12 +13,22 @@ import { SyncIndicator } from './components/SyncIndicator'
 
 const LAST_USER_KEY = 'greek-reader:last-user'
 
-type Tab = 'home' | 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'flashcards'
+type Tab = 'home' | 'grammar' | 'read' | 'readers' | 'practice' | 'flashcards'
 
 function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: () => void }) {
   const { data: corpus, loading, progress, error } = useCorpus()
   const [profile, updateProfile, syncStatus] = useSyncedProfile(username)
   const [tab, setTab] = useState<Tab>('home')
+
+  // Known vocabulary used to be a frequency setting; it is flashcards now. Convert
+  // on the first load that has both a profile carrying the old setting and the
+  // lemma list needed to turn it into cards. Clearing the field is what stops
+  // this running again — and if a device that hasn't migrated syncs the setting
+  // back, it simply runs once more and no-ops on the cards that already exist.
+  useEffect(() => {
+    if (!corpus || profile.vocabThreshold === undefined) return
+    updateProfile((p) => migrateKnownVocab(p, corpus.lemmas))
+  }, [corpus, profile.vocabThreshold, updateProfile])
 
   if (error) {
     return (
@@ -46,7 +56,6 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
     { id: 'home', label: 'Home' },
     { id: 'read', label: 'Passages for you' },
     { id: 'readers', label: 'Read the NT' },
-    { id: 'vocab', label: 'Vocabulary' },
     { id: 'flashcards', label: 'Flashcards' },
     { id: 'grammar', label: 'Verb forms' },
     { id: 'practice', label: 'Verb parsing' },
@@ -92,9 +101,6 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
         {tab === 'home' && <Home corpus={corpus} profile={profile} />}
         {tab === 'grammar' && (
           <VerbFormSetup profile={profile} formStats={corpus.formStats} onChange={updateProfile} />
-        )}
-        {tab === 'vocab' && (
-          <VocabSetup profile={profile} lemmas={corpus.lemmas} onChange={updateProfile} />
         )}
         {tab === 'read' && <Reader corpus={corpus} profile={profile} onChange={updateProfile} />}
         {tab === 'readers' && (

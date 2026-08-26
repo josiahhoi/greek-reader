@@ -174,7 +174,8 @@ export function mergeReadLogs(
  * 3. `activity` is per-day counters — merged per day per counter by max
  *    (see mergeActivityLogs).
  * 4. `readLog` is write-once per verse — earliest date wins (see mergeReadLogs).
- * 5. Everything else (`vocabThreshold`, `excludedLemmas`, `tolerance`, the
+ * 5. Everything else (`excludedLemmas`, `tolerance`, the legacy
+ *    `vocabThreshold`,
  *    Reader's NT settings, and `srsNewPerDay`) is current *settings*, not
  *    accumulated history, so whichever side has the newer `updatedAt` wins for
  *    that whole bundle.
@@ -186,7 +187,13 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
   const settingsSource = local.updatedAt >= remote.updatedAt ? local : remote
   return {
     username: local.username,
-    vocabThreshold: settingsSource.vocabThreshold,
+    // Spread rather than assigned: a migrated profile has no vocabThreshold at
+    // all, and writing the key as undefined would make Firestore reject the
+    // whole document. Present on either side, it survives until whichever
+    // device still has it runs migrateKnownVocab.
+    ...(settingsSource.vocabThreshold !== undefined && {
+      vocabThreshold: settingsSource.vocabThreshold,
+    }),
     excludedLemmas: settingsSource.excludedLemmas,
     tolerance: settingsSource.tolerance,
     readerThreshold: settingsSource.readerThreshold,

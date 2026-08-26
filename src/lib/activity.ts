@@ -22,7 +22,7 @@ export interface DayActivity {
   v: number
   /** Vocabulary flashcards graded. */
   f: number
-  /** Parsing cards graded (Practice tab). */
+  /** Parsing cards graded (Verb parsing tab). */
   p: number
   /** Verb forms newly checked off. */
   g: number

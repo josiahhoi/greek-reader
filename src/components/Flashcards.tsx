@@ -3,8 +3,9 @@ import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import { bump } from '../lib/activity'
 import { useLemmaExamples } from '../hooks/useLemmaExamples'
+import { KnownWords } from './KnownWords'
 import { displayAfter } from '../lib/chapters'
-import { startOfTodayMs, todayKey } from '../lib/dates'
+import { todayKey } from '../lib/dates'
 import { BOOK_BY_ID } from '../data/books'
 import {
   buildQueue,
@@ -38,9 +39,9 @@ export function Flashcards({
   onChange: (updater: (p: Profile) => Profile) => void
 }) {
   const today = todayKey()
-  // Only ticking a word off in the Vocabulary tab keeps it out of the deck
-  // entirely. vocabThreshold deliberately doesn't — see the buildQueue doc
-  // comment — and "I already know this" leaves a card behind on purpose.
+  // Legacy hand-marked words from before knowledge moved into the deck. Still
+  // the one signal that keeps a word out of the deck entirely; nothing writes
+  // it any more, since marking a word known now leaves a mature card behind.
   const handKnown = useMemo(() => new Set(profile.extraKnownLemmas), [profile.extraKnownLemmas])
   const examples = useLemmaExamples(corpus)
 
@@ -81,10 +82,11 @@ export function Flashcards({
     [corpus.lemmas, handKnown, profile.srs, profile.srsNewPerDay, profile.srsMinFreq, today],
   )
 
-  const reviewedToday = useMemo(() => {
-    const since = startOfTodayMs()
-    return Object.values(profile.srs ?? {}).filter((c) => c.reviewed >= since).length
-  }, [profile.srs])
+  // Read off the activity log rather than counted from the deck's `reviewed`
+  // timestamps: marking words known stamps those too, so a profile that had
+  // just converted 312 words claimed 312 reviews it never did. The log counts
+  // grades, which is the question this line is answering.
+  const reviewedToday = profile.activity?.[today]?.f ?? 0
 
   function rebuild(minFreq = profile.srsMinFreq, newPerDay = profile.srsNewPerDay) {
     setQueue(
@@ -340,10 +342,12 @@ export function Flashcards({
         <p className="mt-3 rounded-md bg-emerald-50 p-3 text-center text-sm text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
           <span className="greek">{justLearned.lemma}</span>{' '}
           {justLearned.kind === 'mature'
-            ? `reached a ${MATURE_INTERVAL_DAYS}-day interval — it now counts as known vocabulary in Read and Reader's NT.`
-            : `now counts as known vocabulary in Read and Reader's NT. It comes back in ${MAX_INTERVAL_DAYS} days to be confirmed.`}
+            ? `reached a ${MATURE_INTERVAL_DAYS}-day interval — it now counts as known vocabulary when picking passages.`
+            : `now counts as known vocabulary when picking passages. It comes back in ${MAX_INTERVAL_DAYS} days to be confirmed.`}
         </p>
       )}
+
+      <KnownWords profile={profile} lemmas={corpus.lemmas} onChange={onChange} />
     </div>
   )
 }

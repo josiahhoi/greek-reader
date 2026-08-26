@@ -21,8 +21,3 @@ export function addDays(key: string, days: number): string {
   const [y, m, d] = key.split('-').map(Number)
   return todayKey(new Date(y, m - 1, d + days))
 }
-
-/** Epoch ms at local midnight today — for counting "reviewed today" over timestamps. */
-export function startOfTodayMs(now: Date = new Date()): number {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
-}

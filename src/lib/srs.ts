@@ -1,7 +1,7 @@
 // Spaced-repetition scheduling for the vocabulary deck.
 //
 // A two-button SM-2 variant. Classic SM-2 asks the learner to rate recall 0-5;
-// this deck only offers "Missed it" / "Got it" (matching the Practice tab), so
+// this deck only offers "Missed it" / "Got it" (matching the parsing drill), so
 // a pass scores q=4 and a fail q=1. Those two values are chosen because they
 // make SM-2's own ease formula do the right thing without special-casing:
 // q=4 leaves the ease factor exactly unchanged, q=1 drops it by 0.54. Card
