@@ -3,35 +3,33 @@ import type { Profile } from './profile'
 import { isMature } from './srs'
 
 /**
- * Whether a single lemma counts as known. Two live sources — a flashcard held
- * long enough to be mature, which is what marking a word known now writes, and
- * `extraKnownLemmas` from older versions — plus the legacy frequency threshold
- * while a profile still carries one, and one override that always wins.
+ * Whether a single lemma counts as known: a flashcard held long enough to be
+ * mature, which is what marking a word known writes, unless an explicit
+ * exclusion says otherwise. Plus the legacy frequency threshold, honoured only
+ * while a profile still carries one — migrateKnownVocab converts it, and the
+ * old hand-marked list, into cards on load.
  *
- * Maturity is *derived* here rather than written into `extraKnownLemmas` on
- * graduation, and that's deliberate: `extraKnownLemmas` is union-merged across
- * devices, so anything written there can never be removed again. Deriving it
- * means a lapsed card silently stops counting as known the moment its interval
- * resets, with nothing to undo.
+ * A card is the single source because it can be taken back. Knowing a word is a
+ * claim the deck goes on testing: miss the review and the interval resets, so
+ * the word stops counting as known on its own, with nothing to undo. The lists
+ * this replaced were union-merged across devices and so could only ever grow.
  */
 export function isLemmaKnown(profile: Profile, lemma: LemmaEntry): boolean {
   if (profile.excludedLemmas.includes(lemma.lemma)) return false
   return (
     (profile.vocabThreshold !== undefined && lemma.freq >= profile.vocabThreshold) ||
-    profile.extraKnownLemmas.includes(lemma.lemma) ||
     isMature((profile.srs ?? {})[lemma.lemma])
   )
 }
 
 export function deriveKnownLemmas(profile: Profile, lemmas: LemmaEntry[]): Set<number> {
   const excluded = new Set(profile.excludedLemmas)
-  const extra = new Set(profile.extraKnownLemmas)
   const srs = profile.srs ?? {}
   const threshold = profile.vocabThreshold ?? Infinity
   const out = new Set<number>()
   lemmas.forEach((l, i) => {
     if (excluded.has(l.lemma)) return
-    if (l.freq >= threshold || extra.has(l.lemma) || isMature(srs[l.lemma])) out.add(i)
+    if (l.freq >= threshold || isMature(srs[l.lemma])) out.add(i)
   })
   return out
 }

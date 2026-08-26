@@ -93,55 +93,51 @@ const lemmas = [
   { lemma: 'alpha', freq: 100 }, { lemma: 'beta', freq: 90 }, { lemma: 'gamma', freq: 80 },
   { lemma: 'delta', freq: 70 }, { lemma: 'eps', freq: 60 },
 ]
-const known = new Set<string>(['alpha'])     // hand-marked "I already know this"
 const deck: SrsDeck = {
   gamma: { ...newCard('2026-08-20'), due: '2026-08-20', reps: 3, interval: 5, reviewed: 5 },
   delta: { ...newCard('2026-08-22'), due: '2026-08-22', reps: 0, interval: 0, reviewed: 9 },
 }
-const q = buildQueue(lemmas, known, deck, 10, 1, T)
+const q = buildQueue(lemmas, deck, 10, 1, T)
 check('due cards come before new', q.queue.slice(0, 2).every((i) => ['gamma', 'delta'].includes(lemmas[i].lemma)), q.queue.map(i=>lemmas[i].lemma).join(','))
 check('most overdue first (gamma 08-20 before delta 08-22)', lemmas[q.queue[0]].lemma === 'gamma')
-check('new cards by desc freq, hand-known excluded', lemmas[q.queue[2]].lemma === 'beta' && lemmas[q.queue[3]].lemma === 'eps', q.queue.map(i=>lemmas[i].lemma).join(','))
-check('hand-known lemma never offered as new', !q.queue.some((i) => lemmas[i].lemma === 'alpha'))
+check('new cards by desc freq', lemmas[q.queue[2]].lemma === 'alpha' && lemmas[q.queue[3]].lemma === 'beta', q.queue.map(i=>lemmas[i].lemma).join(','))
 check('counts: 1 review + 1 learning', q.counts.review === 1 && q.counts.learning === 1, JSON.stringify(q.counts))
 
 // --- deck range (minFreq) ---
 // Regression test for the reported bug: the deck used to be gated by
 // vocabThreshold via deriveKnownLemmas, so raising the threshold silently hid
 // the commonest words. buildQueue no longer sees a threshold at all.
-const noneKnown = new Set<string>()
-const qAll = buildQueue(lemmas, noneKnown, {}, 10, 1, T)
+const qAll = buildQueue(lemmas, {}, 10, 1, T)
 check('minFreq 1 offers the highest-frequency lemma first', lemmas[qAll.queue[0]].lemma === 'alpha', qAll.queue.map(i=>lemmas[i].lemma).join(','))
 check('minFreq 1 offers every lemma', qAll.queue.length === lemmas.length, String(qAll.queue.length))
-const q80 = buildQueue(lemmas, noneKnown, {}, 10, 80, T)
+const q80 = buildQueue(lemmas, {}, 10, 80, T)
 check('minFreq 80 keeps only the three >=80x lemmas', q80.queue.length === 3, q80.queue.map(i=>lemmas[i].lemma).join(','))
 check('minFreq 80 excludes the 70x lemma', !q80.queue.some((i) => lemmas[i].lemma === 'delta'))
 
 // newPerDay cap + introduced-today derivation
 const deck2: SrsDeck = { beta: { ...newCard(T), introduced: T } }
-const q2 = buildQueue(lemmas, known, deck2, 2, 1, T)
+const q2 = buildQueue(lemmas, deck2, 2, 1, T)
 check('introducedToday derived = 1', q2.counts.introducedToday === 1, String(q2.counts.introducedToday))
 check('newRemaining = 2-1 = 1', q2.counts.newRemaining === 1, String(q2.counts.newRemaining))
 const freshOnly = q2.queue.filter((i) => !(lemmas[i].lemma in deck2))
 check('cap honoured: only 1 new offered', freshOnly.length === 1, String(freshOnly.length))
-const q2again = buildQueue(lemmas, known, deck2, 2, 1, T)
+const q2again = buildQueue(lemmas, deck2, 2, 1, T)
 check('rebuilding same day does not grow the count', q2again.counts.introducedToday === 1)
 check('existing card never re-offered as new', !freshOnly.some((i) => lemmas[i].lemma === 'beta'))
 
 // A word marked known today is not a word taken on to learn, so it must not
 // spend the daily new-card allowance the way an ordinary new card does.
 const deck3: SrsDeck = { beta: { ...newCard(T), introduced: T }, gamma: knownCard(undefined, D(T)) }
-const q4 = buildQueue(lemmas, noneKnown, deck3, 2, 1, T)
+const q4 = buildQueue(lemmas, deck3, 2, 1, T)
 check('hand-known card does not spend the new allowance', q4.counts.introducedToday === 1, String(q4.counts.introducedToday))
 check('a genuine new card still spends it', q4.counts.newRemaining === 1, String(q4.counts.newRemaining))
 check('hand-known card is not due today', !q4.queue.some((i) => lemmas[i].lemma === 'gamma'), q4.queue.map(i=>lemmas[i].lemma).join(','))
-const q5 = buildQueue(lemmas, noneKnown, deck3, 2, 1, addDays(T, MAX_INTERVAL_DAYS))
+const q5 = buildQueue(lemmas, deck3, 2, 1, addDays(T, MAX_INTERVAL_DAYS))
 check('hand-known card comes back at the ceiling', q5.queue.some((i) => lemmas[i].lemma === 'gamma'), q5.queue.map(i=>lemmas[i].lemma).join(','))
 
 // a card whose lemma became known stays on schedule
 const matureDeck: SrsDeck = { eps: { ...newCard(T), due: T, interval: 30, reps: 6 } }
-const knownIncludingEps = new Set<string>(['alpha', 'eps'])
-const q3 = buildQueue(lemmas, knownIncludingEps, matureDeck, 10, 1, T)
+const q3 = buildQueue(lemmas, matureDeck, 10, 1, T)
 check('mature card still reviewed despite being known', q3.queue.some((i) => lemmas[i].lemma === 'eps'))
 
 // requeue
@@ -170,12 +166,30 @@ const remarked = markKnownAbove(partly, vocab, 50, D(T))
 check('a card already being learned is not overwritten', remarked.srs.alpha.interval === 6, String(remarked.srs.alpha.interval))
 check('re-running the same tier is a no-op', markKnownAbove(marked, vocab, 50, D(T)) === marked)
 
+const withExclusion: Profile = { ...base, excludedLemmas: ['beta'] }
+const skipped = markKnownAbove(withExclusion, vocab, 50, D(T))
+check('a blanket tier skips an excluded word', skipped.srs.beta === undefined && Object.keys(skipped.srs).join(',') === 'alpha', Object.keys(skipped.srs).join(','))
+check('a blanket tier leaves exclusions alone', skipped.excludedLemmas.join(',') === 'beta')
+check('an excluded word stays unknown', !isLemmaKnown(skipped, vocab[1]))
+
 const unknown = toggleKnown(marked, vocab[0], D(T))
 check('un-marking puts the word back in the deck, due today', unknown.srs.alpha.due === T && unknown.srs.alpha.interval === 0, JSON.stringify(unknown.srs.alpha))
 check('un-marked word no longer counts as known', !isLemmaKnown(unknown, vocab[0]))
 const reknown = toggleKnown(unknown, vocab[0], D(T))
 check('marking it known again re-matures it', isLemmaKnown(reknown, vocab[0]) && reknown.srs.alpha.interval === MAX_INTERVAL_DAYS)
 check('marking a single word does score activity', (reknown.activity[T]?.k ?? 0) === 1, JSON.stringify(reknown.activity[T]))
+
+// legacy hand-marked list -> cards
+const handMarked: Profile = { ...base, extraKnownLemmas: ['gamma'] }
+const handMigrated = migrateKnownVocab(handMarked, vocab, D(T))
+check('migration cards a hand-marked word', isMature(handMigrated.srs.gamma), JSON.stringify(handMigrated.srs.gamma))
+check('migration clears the hand-marked list', handMigrated.extraKnownLemmas.length === 0)
+check('the hand-marked word stays known', isLemmaKnown(handMigrated, vocab[2]))
+const handExcluded: Profile = { ...base, extraKnownLemmas: ['gamma'], excludedLemmas: ['gamma'] }
+check(
+  'a hand-marked word that was later excluded is not resurrected',
+  migrateKnownVocab(handExcluded, vocab, D(T)).srs.gamma === undefined,
+)
 
 // legacy vocabThreshold -> cards
 const legacy: Profile = { ...base, vocabThreshold: 50 }
@@ -185,6 +199,7 @@ check('migration drops the threshold field', migrated.vocabThreshold === undefin
 check('migration keeps the same words known', isLemmaKnown(migrated, vocab[0]) && isLemmaKnown(migrated, vocab[1]) && !isLemmaKnown(migrated, vocab[2]))
 check('migration writes them as cards', Object.keys(migrated.srs).sort().join(',') === 'alpha,beta', Object.keys(migrated.srs).join(','))
 check('migration is idempotent', migrateKnownVocab(migrated, vocab, D(T)) === migrated)
+check('every known word now has a card', vocab.every((l) => !isLemmaKnown(migrated, l) || migrated.srs[l.lemma] !== undefined))
 check('a profile with no threshold is untouched', migrateKnownVocab(base, vocab, D(T)) === base)
 
 // --- merge ---

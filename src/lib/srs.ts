@@ -200,18 +200,11 @@ export interface BuiltQueue {
  * Order is overdue reviews oldest-first (ties broken by corpus frequency), then
  * new cards by descending frequency, so the highest-value words come first.
  *
- * A lemma becomes a new card when it has no card yet, occurs at least
- * `minFreq` times, and isn't in `handKnown`.
- *
- * `handKnown` is `extraKnownLemmas` — words ticked off by hand in the Vocabulary
- * tab. It is deliberately the *only* knowledge signal that removes a word from
- * the deck.
- * In particular `vocabThreshold` does not: it declares what you can read
- * without a gloss, which is a different claim from being able to recall a word
- * cold, and letting it gate the deck meant a threshold of 20 silently hid the
- * 637 most common words from ever being drilled. Nor does SRS maturity, which
- * removes a word anyway by virtue of it having a card; nor `excludedLemmas`,
- * which says you *don't* know a word and so should certainly be drilled.
+ * A lemma becomes a new card when it has no card yet and occurs at least
+ * `minFreq` times. Nothing else keeps a word out: knowing a word is not a reason
+ * to be absent from the deck but a reason to hold a mature card in it, which
+ * this loop skips anyway because the card exists. `excludedLemmas` says you
+ * *don't* know a word, so it should certainly be drilled.
  *
  * The daily new-card allowance is enforced by counting cards whose `introduced`
  * date is today *and that aren't already mature*. The maturity part is what keeps
@@ -225,7 +218,6 @@ export interface BuiltQueue {
  */
 export function buildQueue(
   lemmas: { lemma: string; freq: number }[],
-  handKnown: ReadonlySet<string>,
   deck: SrsDeck,
   newPerDay: number,
   minFreq: number,
@@ -252,8 +244,8 @@ export function buildQueue(
       }
       continue
     }
-    // New cards: anything in range that hasn't been hand-marked as known.
-    if (lemmas[i].freq >= minFreq && !handKnown.has(lemmas[i].lemma)) freshPool.push(i)
+    // New cards: anything in range without a card yet.
+    if (lemmas[i].freq >= minFreq) freshPool.push(i)
   }
 
   dueIdx.sort((a, b) => {

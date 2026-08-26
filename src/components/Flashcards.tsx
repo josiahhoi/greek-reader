@@ -39,10 +39,6 @@ export function Flashcards({
   onChange: (updater: (p: Profile) => Profile) => void
 }) {
   const today = todayKey()
-  // Legacy hand-marked words from before knowledge moved into the deck. Still
-  // the one signal that keeps a word out of the deck entirely; nothing writes
-  // it any more, since marking a word known now leaves a mature card behind.
-  const handKnown = useMemo(() => new Set(profile.extraKnownLemmas), [profile.extraKnownLemmas])
   const examples = useLemmaExamples(corpus)
 
   // The queue is state, not a memo: a memo keyed on `profile` would rebuild
@@ -52,14 +48,8 @@ export function Flashcards({
   // the unmount that happens on every tab switch.
   const [queue, setQueue] = useState<number[]>(
     () =>
-      buildQueue(
-        corpus.lemmas,
-        handKnown,
-        profile.srs ?? {},
-        profile.srsNewPerDay,
-        profile.srsMinFreq,
-        today,
-      ).queue,
+      buildQueue(corpus.lemmas, profile.srs ?? {}, profile.srsNewPerDay, profile.srsMinFreq, today)
+        .queue,
   )
   const [revealed, setRevealed] = useState(false)
   // What the banner under the card is announcing, if anything: a card that just
@@ -71,15 +61,9 @@ export function Flashcards({
 
   const counts = useMemo(
     () =>
-      buildQueue(
-        corpus.lemmas,
-        handKnown,
-        profile.srs ?? {},
-        profile.srsNewPerDay,
-        profile.srsMinFreq,
-        today,
-      ).counts,
-    [corpus.lemmas, handKnown, profile.srs, profile.srsNewPerDay, profile.srsMinFreq, today],
+      buildQueue(corpus.lemmas, profile.srs ?? {}, profile.srsNewPerDay, profile.srsMinFreq, today)
+        .counts,
+    [corpus.lemmas, profile.srs, profile.srsNewPerDay, profile.srsMinFreq, today],
   )
 
   // Read off the activity log rather than counted from the deck's `reviewed`
@@ -89,9 +73,7 @@ export function Flashcards({
   const reviewedToday = profile.activity?.[today]?.f ?? 0
 
   function rebuild(minFreq = profile.srsMinFreq, newPerDay = profile.srsNewPerDay) {
-    setQueue(
-      buildQueue(corpus.lemmas, handKnown, profile.srs ?? {}, newPerDay, minFreq, today).queue,
-    )
+    setQueue(buildQueue(corpus.lemmas, profile.srs ?? {}, newPerDay, minFreq, today).queue)
     setRevealed(false)
     setJustLearned(null)
   }
@@ -196,17 +178,15 @@ export function Flashcards({
   }, [profile.srs, today])
 
   const deckSize = Object.keys(profile.srs ?? {}).length
-  // Words the deck could still draw on: in range, not hand-known, no card yet.
   const inRange = useMemo(
-    () => corpus.lemmas.filter((l) => l.freq >= profile.srsMinFreq && !handKnown.has(l.lemma)).length,
-    [corpus.lemmas, profile.srsMinFreq, handKnown],
+    () => corpus.lemmas.filter((l) => l.freq >= profile.srsMinFreq).length,
+    [corpus.lemmas, profile.srsMinFreq],
   )
+  // Words the deck could still draw on: in range, no card yet.
   const unlearnedRemain = useMemo(() => {
     const deck = profile.srs ?? {}
-    return corpus.lemmas.filter(
-      (l) => l.freq >= profile.srsMinFreq && !handKnown.has(l.lemma) && !deck[l.lemma],
-    ).length
-  }, [corpus.lemmas, profile.srsMinFreq, handKnown, profile.srs])
+    return corpus.lemmas.filter((l) => l.freq >= profile.srsMinFreq && !deck[l.lemma]).length
+  }, [corpus.lemmas, profile.srsMinFreq, profile.srs])
 
   return (
     <div>

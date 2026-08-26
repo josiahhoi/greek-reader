@@ -20,15 +20,17 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
   const [profile, updateProfile, syncStatus] = useSyncedProfile(username)
   const [tab, setTab] = useState<Tab>('home')
 
-  // Known vocabulary used to be a frequency setting; it is flashcards now. Convert
-  // on the first load that has both a profile carrying the old setting and the
-  // lemma list needed to turn it into cards. Clearing the field is what stops
-  // this running again — and if a device that hasn't migrated syncs the setting
-  // back, it simply runs once more and no-ops on the cards that already exist.
+  // Known vocabulary used to be a frequency setting and a hand-marked list; it is
+  // flashcards now. Convert on the first load that has both a profile carrying
+  // one of those and the lemma list needed to turn it into cards. Clearing them
+  // is what stops this running again — and if a device that hasn't migrated syncs
+  // the old fields back, it simply runs once more and no-ops on the cards that
+  // already exist.
+  const legacyKnown = profile.vocabThreshold !== undefined || profile.extraKnownLemmas.length > 0
   useEffect(() => {
-    if (!corpus || profile.vocabThreshold === undefined) return
+    if (!corpus || !legacyKnown) return
     updateProfile((p) => migrateKnownVocab(p, corpus.lemmas))
-  }, [corpus, profile.vocabThreshold, updateProfile])
+  }, [corpus, legacyKnown, updateProfile])
 
   if (error) {
     return (
