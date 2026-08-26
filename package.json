@@ -11,7 +11,8 @@
     "build:corpus": "tsx scripts/build-corpus.ts",
     "verify:corpus": "tsx scripts/verify-corpus.ts",
     "verify:srs": "tsx scripts/verify-srs.ts",
-    "verify:activity": "tsx scripts/verify-activity.ts"
+    "verify:activity": "tsx scripts/verify-activity.ts",
+    "verify:english": "tsx scripts/verify-english.ts"
   },
   "dependencies": {
     "firebase": "^12.17.1",

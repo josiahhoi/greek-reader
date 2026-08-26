@@ -13,6 +13,7 @@ export function WordDetail({
   knownForms,
   contextGloss,
   verseRef,
+  englishForm,
 }: {
   lemma: LemmaEntry
   rmac?: RmacEntry
@@ -22,6 +23,8 @@ export function WordDetail({
   contextGloss?: string
   /** Shown when the word is presented outside its verse (e.g. a flashcard). */
   verseRef?: string
+  /** The English this form comes out as, e.g. "he/she/it was". See englishVerb.ts. */
+  englishForm?: string
 }) {
   const form = rmac && rmac.form >= 0 ? VERB_FORMS[rmac.form] : undefined
   const missingForm = form && knownForms && !knownForms.has(form.id) ? form : undefined
@@ -33,6 +36,14 @@ export function WordDetail({
       </p>
       <p className="text-stone-500 dark:text-stone-400">{lemma.gloss}</p>
       {rmac && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{rmac.label}</p>}
+      {englishForm && (
+        <p
+          className="mt-1 text-xs text-stone-600 dark:text-stone-300"
+          title="Roughly how this form comes out in English"
+        >
+          ≈ “{englishForm}”
+        </p>
+      )}
       {contextGloss && (
         <p className="mt-1 text-xs text-stone-400">in context: “{contextGloss}”</p>
       )}

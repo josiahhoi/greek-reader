@@ -6,7 +6,8 @@ import { todayKey } from '../lib/dates'
 import { groupEligibleByForm, pickCard } from '../lib/quiz'
 import { loadDailyScore, recordAnswer, type DailyScore } from '../lib/dailyScore'
 import { loadFormStats, recordFormAnswer, type FormStats } from '../lib/formStats'
-import { VERB_FORM_IDS } from '../data/verbForms'
+import { VERB_FORM_IDS, VERB_FORMS } from '../data/verbForms'
+import { englishVerbForm } from '../lib/englishVerb'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import type { VerbTokenRef } from '../lib/quizTypes'
@@ -34,15 +35,19 @@ export function Practice({
     [eligibleByForm],
   )
 
-  const bookAbbrById = useMemo(
-    () => new Map(corpus.bookIndex.map((b) => [b.id, b.abbr])),
-    [corpus.bookIndex],
-  )
-
   const [card, setCard] = useState<VerbTokenRef | null>(() => pickCard(eligibleByForm))
   const [revealed, setRevealed] = useState(false)
   const [score, setScore] = useState<DailyScore>(() => loadDailyScore(profile.username))
   const [formStats, setFormStats] = useState<FormStats>(() => loadFormStats(profile.username))
+
+  // The English this form comes out as — the answer the parse is asking for,
+  // spelled out. Null for the handful of glosses that can't be conjugated.
+  const englishForm = useMemo(() => {
+    if (!card) return null
+    const rmac = corpus.rmacTable[card.rmacIdx]
+    if (rmac.form < 0) return null
+    return englishVerbForm(corpus.lemmas[card.lemmaId].gloss, rmac.code, VERB_FORMS[rmac.form])
+  }, [card, corpus.lemmas, corpus.rmacTable])
 
   function nextCard() {
     setCard((prev) => pickCard(eligibleByForm, prev))
@@ -135,8 +140,7 @@ export function Practice({
                 <WordDetail
                   lemma={corpus.lemmas[card.lemmaId]}
                   rmac={corpus.rmacTable[card.rmacIdx]}
-                  contextGloss={card.contextGloss}
-                  verseRef={`${bookAbbrById.get(card.bookId) ?? card.bookId} ${card.chapter}:${card.verse}`}
+                  englishForm={englishForm ?? undefined}
                 />
               </div>
               <div className="mt-6 flex justify-center gap-3">
