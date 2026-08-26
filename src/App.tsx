@@ -9,12 +9,11 @@ import { Reader } from './components/Reader'
 import { ReadersText } from './components/ReadersText'
 import { Practice } from './components/Practice'
 import { Flashcards } from './components/Flashcards'
-import { Progress } from './components/Progress'
 import { SyncIndicator } from './components/SyncIndicator'
 
 const LAST_USER_KEY = 'greek-reader:last-user'
 
-type Tab = 'home' | 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'flashcards' | 'progress'
+type Tab = 'home' | 'grammar' | 'vocab' | 'read' | 'readers' | 'practice' | 'flashcards'
 
 function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: () => void }) {
   const { data: corpus, loading, progress, error } = useCorpus()
@@ -41,15 +40,16 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
     )
   }
 
+  // Labels say what the tab gives you: "Read" and "Reader's NT" were a coin
+  // toss from the outside, and "Practice" could have meant any of four tabs.
   const tabs: { id: Tab; label: string }[] = [
     { id: 'home', label: 'Home' },
-    { id: 'grammar', label: 'Verb forms' },
+    { id: 'read', label: 'Passages for you' },
+    { id: 'readers', label: 'Read the NT' },
     { id: 'vocab', label: 'Vocabulary' },
-    { id: 'read', label: 'Read' },
-    { id: 'readers', label: "Reader's NT" },
-    { id: 'practice', label: 'Practice' },
     { id: 'flashcards', label: 'Flashcards' },
-    { id: 'progress', label: 'Progress' },
+    { id: 'grammar', label: 'Verb forms' },
+    { id: 'practice', label: 'Verb parsing' },
   ]
 
   return (
@@ -67,13 +67,16 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
             </button>
           </div>
         </div>
-        <nav className="mx-auto flex max-w-3xl gap-1 overflow-x-auto px-4">
+        {/* Wraps rather than scrolls: seven descriptive labels don't fit one
+            line on a phone, and a tab you have to scroll sideways to find is a
+            tab you won't find. The padding does the separating, so no gap. */}
+        <nav className="mx-auto flex max-w-3xl flex-wrap px-4">
           {tabs.map((t) => (
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
               className={
-                'shrink-0 whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium transition-colors ' +
+                'shrink-0 whitespace-nowrap border-b-2 px-2.5 py-2 text-sm font-medium transition-colors ' +
                 (tab === t.id
                   ? 'border-stone-900 text-stone-900 dark:border-stone-100 dark:text-stone-100'
                   : 'border-transparent text-stone-400 hover:text-stone-700 dark:hover:text-stone-300')
@@ -103,7 +106,6 @@ function AppShell({ username, onSwitchUser }: { username: string; onSwitchUser: 
         {tab === 'flashcards' && (
           <Flashcards corpus={corpus} profile={profile} onChange={updateProfile} />
         )}
-        {tab === 'progress' && <Progress corpus={corpus} profile={profile} />}
       </main>
     </div>
   )
