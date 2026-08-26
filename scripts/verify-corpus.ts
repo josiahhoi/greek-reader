@@ -5,6 +5,7 @@ import path from 'node:path'
 import { VERB_FORMS, VERB_FORM_IDS } from '../src/data/verbForms.ts'
 import { BOOKS } from '../src/data/books.ts'
 import type { RmacEntry } from '../src/lib/corpusTypes.ts'
+import { firstPersonGloss } from './lib/verbGloss.ts'
 
 const DATA_DIR = path.resolve(import.meta.dirname, '..', 'public', 'data')
 
@@ -76,6 +77,7 @@ check(
 )
 
 let totalTokensInBooks = 0
+const verbLemmaIds = new Set<number>()
 let totalVersesInBooks = 0
 let verbTokensInBooks = 0
 let badRmacIds = 0
@@ -91,10 +93,32 @@ for (const entry of booksIndex) {
       totalTokensInBooks++
       if (tok.l < 0 || tok.l >= lemmas.length) badLemmaIds++
       if (typeof tok.r !== 'number' || tok.r < 0 || tok.r >= rmacTable.length) badRmacIds++
-      else if (rmacTable[tok.r].form >= 0) verbTokensInBooks++
+      else if (rmacTable[tok.r].form >= 0) {
+        verbTokensInBooks++
+        verbLemmaIds.add(tok.l)
+      }
     }
   }
 }
+// Verbs are headed by their 1st person singular, not by an English infinitive:
+// a leftover "to come/go" means the rewrite in build-corpus.ts stopped running.
+const staleVerbGlosses = [...verbLemmaIds]
+  .map((id) => lemmas[id])
+  .filter((l: { lemma: string; gloss: string }) => firstPersonGloss(l.lemma, l.gloss) !== null)
+check(
+  'no verb gloss is left in the infinitive',
+  staleVerbGlosses.length === 0,
+  staleVerbGlosses
+    .slice(0, 5)
+    .map((l: { lemma: string; gloss: string }) => `${l.lemma} "${l.gloss}"`)
+    .join(', '),
+)
+check(
+  'verb glosses are headed in the 1st person',
+  [...verbLemmaIds].filter((id) => lemmas[id].gloss.startsWith('I ')).length === 1827,
+  String([...verbLemmaIds].filter((id) => lemmas[id].gloss.startsWith('I ')).length),
+)
+
 check('sum of per-book verses matches meta', totalVersesInBooks === meta.verseCount)
 check('sum of per-book tokens matches meta', totalTokensInBooks === meta.tokenCount)
 check('every token has a valid lemma id', badLemmaIds === 0, `${badLemmaIds} bad`)

@@ -4,17 +4,21 @@
 //
 // Run: npm run build:corpus
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { ensureOpenGntCsv, ensureRmacLexiconCsv } from './lib/sources.ts'
 import { parseRmacLexicon } from './lib/rmac-lexicon.ts'
 import { parseOpenGnt, type RawToken } from './lib/opengnt.ts'
+import { firstPersonGloss } from './lib/verbGloss.ts'
 import { decodeRmacDescription } from '../src/lib/rmac.ts'
 import { VERB_FORM_IDS } from '../src/data/verbForms.ts'
 import { BOOKS } from '../src/data/books.ts'
 import type { CorpusToken, CorpusVerse, RmacEntry } from '../src/lib/corpusTypes.ts'
 
 const OUT_DIR = path.resolve(import.meta.dirname, '..', 'public', 'data')
+/** CC BY-SA attribution shipped beside the data it covers. Lives here because
+ *  the build wipes OUT_DIR, and the corpus may not be redistributed without it. */
+const LICENSE_SRC = path.resolve(import.meta.dirname, 'data-license.txt')
 
 const VERB_FORM_INDEX: Record<string, number> = Object.fromEntries(
   VERB_FORM_IDS.map((id, i) => [id, i]),
@@ -26,6 +30,8 @@ interface LemmaEntry {
   gloss: string
   strongs: string
   freq: number
+  /** Set once any token of this lemma parses as a verb. Drives the gloss rewrite. */
+  isVerb: boolean
 }
 
 type OutToken = CorpusToken
@@ -89,6 +95,7 @@ async function main() {
         gloss: t.glossDict,
         strongs: t.strongs,
         freq: 0,
+        isVerb: false,
       }
       lemmaIndex.set(t.lemma, entry)
     }
@@ -107,6 +114,7 @@ async function main() {
     const rIdx = rmacId(t)
     const form = rmacTable[rIdx].form
     if (form >= 0) {
+      lemmaIndex.get(t.lemma)!.isVerb = true
       verbTokenCount++
       formTokenCounts.set(form, (formTokenCounts.get(form) ?? 0) + 1)
     }
@@ -137,8 +145,23 @@ async function main() {
   // --- Write output ---
   if (existsSync(OUT_DIR)) rmSync(OUT_DIR, { recursive: true })
   mkdirSync(path.join(OUT_DIR, 'books'), { recursive: true })
+  copyFileSync(LICENSE_SRC, path.join(OUT_DIR, 'LICENSE'))
 
+  // A verb is headed by its 1st person singular in every lexicon a student will
+  // meet, so ἔρχομαι reads "I come/go" rather than TBESG's "to come/go". Done
+  // here rather than at first sight of the lemma because whether a lemma is a
+  // verb is only settled once every one of its tokens has been parsed.
   const lemmas = [...lemmaIndex.values()].sort((a, b) => a.id - b.id)
+  let rewritten = 0
+  for (const entry of lemmas) {
+    if (!entry.isVerb) continue
+    const firstPerson = firstPersonGloss(entry.lemma, entry.gloss)
+    if (firstPerson === null) continue
+    entry.gloss = firstPerson
+    rewritten++
+  }
+  console.log(`  ${rewritten} verb glosses rewritten to the 1st person`)
+
   writeFileSync(
     path.join(OUT_DIR, 'lemmas.json'),
     JSON.stringify(lemmas.map(({ lemma, gloss, strongs, freq }) => ({ lemma, gloss, strongs, freq }))),
