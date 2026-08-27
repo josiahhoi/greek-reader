@@ -3,7 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <!-- iOS reads these, not the web app manifest, when adding to the home
+         screen: the PNG for the icon and theme-color for the status bar. -->
+    <link rel="apple-touch-icon" href="/icons/icon-180.png" />
+    <meta name="apple-mobile-web-app-title" content="Ἀναγνώστης" />
+    <meta name="theme-color" content="#1c1917" />
     <title>Greek Reader</title>
   </head>
   <body>

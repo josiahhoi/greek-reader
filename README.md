@@ -33,6 +33,25 @@ npm run verify:corpus  # sanity-checks the build output
 npm run dev
 ```
 
+`npm run build:icons` re-rasterises the home-screen PNGs from `public/app-icon.svg`. The PNGs are
+committed, so only run it when the artwork changes.
+
+## Install for offline use
+
+The app is a PWA: once installed it holds the whole corpus locally and works with no connection at
+all — the same 12MB it downloads on every cold load anyway, so caching it costs no extra bandwidth.
+
+- **iPhone / iPad** — open the site in Safari, then Share → *Add to Home Screen*.
+- **Desktop Chrome / Edge** — click the install icon at the right of the address bar.
+- **macOS Safari 17+** — File → *Add to Dock*.
+
+Two things to know. The first launch has to be online: it downloads the corpus once, and after that
+the app opens offline. And each install is its own storage container — an iPhone home-screen app
+does not share storage with Safari — so a new install starts with an empty profile and pulls yours
+down from Firestore by username, which also needs that first launch to be online. After that,
+studying offline is fully local; work done offline syncs on the next change you make with a
+connection.
+
 ## License
 
 App code is unlicensed for now (private use). Compiled data under `public/data/` is derived

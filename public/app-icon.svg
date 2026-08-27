@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <!--
+    The home-screen mark: the app's own initial, Ἀ, on its stone background.
+    Deliberately dark rather than light — an icon sits on the user's wallpaper,
+    not on the app's page, and the dark tile matches the reader's night theme
+    while staying legible on a light home screen.
+
+    The letter is drawn as a path rather than set as text so rasterising it does
+    not depend on Gentium Plus being installed wherever this is rendered.
+  -->
+  <rect width="512" height="512" fill="#1c1917"/>
+  <g fill="#10b981">
+    <!-- Alpha: two legs and a crossbar, wide-set like the Gentium capital. -->
+    <path d="M256 108 L 372 404 L 330 404 L 296 314 L 216 314 L 182 404 L 140 404 Z M 256 186 L 228 278 L 284 278 Z"/>
+    <!-- Rough breathing plus acute, the diacritics on Ἀναγνώστης. -->
+    <path d="M196 92 a 15 15 0 1 1 30 0 a 15 15 0 1 1 -30 0 Z M 204 92 a 7 7 0 1 0 14 0 a 7 7 0 1 0 -14 0 Z"/>
+    <path d="M248 62 L 286 62 L 258 100 L 236 100 Z"/>
+  </g>
+</svg>
