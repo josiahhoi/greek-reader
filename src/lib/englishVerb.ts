@@ -235,12 +235,17 @@ function gerund(base: string): string {
 /**
  * The gloss split into the verb being conjugated and whatever trails it.
  * "I go out" -> heads ['go'], tail 'out'. "I have/am" -> heads ['have', 'be'].
+ * "I say, speak" -> heads ['say'], the second sense dropped.
  * The 1st person present that heads the gloss is the bare stem for every English
  * verb except "am", which is where the whole irregular paradigm of "be" hangs.
  */
 function splitGloss(gloss: string): { heads: string[]; tail: string } | null {
   if (!gloss.startsWith('I ')) return null
-  const words = gloss.slice(2).split(' ')
+  // Only the first sense is conjugated. A gloss often lists several ("I say,
+  // speak" — and an imported one may list six), and conjugating every one turns
+  // a one-line study aid into a paragraph. The full definition is on the line
+  // above; this line exists to answer which person and number the ending is.
+  const words = gloss.slice(2).split(',')[0].trim().split(' ')
   const heads = words[0].split('/').map((word) => (word === 'am' ? 'be' : word))
   if (heads.some((head) => !/^[a-z()-]+$/.test(head))) return null
   return { heads, tail: words.slice(1).join(' ') }

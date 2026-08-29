@@ -292,6 +292,7 @@ export function ReadersText({
                                   knownForms={ctx.knownForms}
                                   contextGloss={tok.g}
                                   verseRef={`${book.abbr} ${run.verse.c}:${run.verse.v}`}
+                                  glosses={profile.glosses}
                                 />
                               </div>
                             )}

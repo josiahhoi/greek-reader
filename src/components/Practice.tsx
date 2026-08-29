@@ -8,6 +8,7 @@ import { loadDailyScore, recordAnswer, type DailyScore } from '../lib/dailyScore
 import { loadFormStats, recordFormAnswer, type FormStats } from '../lib/formStats'
 import { VERB_FORM_IDS, VERB_FORMS } from '../data/verbForms'
 import { englishVerbForm } from '../lib/englishVerb'
+import { glossOf } from '../lib/glosses'
 import type { CorpusData } from '../lib/loadCorpus'
 import type { Profile } from '../lib/profile'
 import type { VerbTokenRef } from '../lib/quizTypes'
@@ -46,8 +47,12 @@ export function Practice({
     if (!card) return null
     const rmac = corpus.rmacTable[card.rmacIdx]
     if (rmac.form < 0) return null
-    return englishVerbForm(corpus.lemmas[card.lemmaId].gloss, rmac.code, VERB_FORMS[rmac.form])
-  }, [card, corpus.lemmas, corpus.rmacTable])
+    return englishVerbForm(
+      glossOf(profile, corpus.lemmas[card.lemmaId]),
+      rmac.code,
+      VERB_FORMS[rmac.form],
+    )
+  }, [card, corpus.lemmas, corpus.rmacTable, profile])
 
   function nextCard() {
     setCard((prev) => pickCard(eligibleByForm, prev))
@@ -141,6 +146,7 @@ export function Practice({
                   lemma={corpus.lemmas[card.lemmaId]}
                   rmac={corpus.rmacTable[card.rmacIdx]}
                   englishForm={englishForm ?? undefined}
+                  glosses={profile.glosses}
                 />
               </div>
               <div className="mt-6 flex justify-center gap-3">

@@ -23,3 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 .cache/
+
+# Imported personal definitions: private to a learner, never committed.
+greek-reader-glosses.json

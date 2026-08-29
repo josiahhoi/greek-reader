@@ -50,6 +50,7 @@ export async function fetchRemoteProfile(username: string): Promise<Profile | nu
     srs?: unknown
     activity?: unknown
     readLog?: unknown
+    glosses?: unknown
   }
   return {
     ...defaultProfile(username),
@@ -57,6 +58,7 @@ export async function fetchRemoteProfile(username: string): Promise<Profile | nu
     srs: decodeMap<SrsDeck>(data.srs),
     activity: decodeMap<ActivityLog>(data.activity),
     readLog: decodeMap<Record<string, string>>(data.readLog),
+    glosses: decodeMap<Record<string, string>>(data.glosses),
     username: normalizeUsername(username),
   }
 }
@@ -68,6 +70,7 @@ export async function pushProfile(profile: Profile): Promise<void> {
     srs: encodeMap(profile.srs),
     activity: encodeMap(profile.activity),
     readLog: encodeMap(profile.readLog),
+    glosses: encodeMap(profile.glosses),
   })
 }
 
@@ -174,7 +177,7 @@ export function mergeReadLogs(
  * 3. `activity` is per-day counters — merged per day per counter by max
  *    (see mergeActivityLogs).
  * 4. `readLog` is write-once per verse — earliest date wins (see mergeReadLogs).
- * 5. Everything else (`excludedLemmas`, `tolerance`, the legacy
+ * 5. Everything else (`excludedLemmas`, `tolerance`, `glosses`, the legacy
  *    `vocabThreshold`,
  *    Reader's NT settings, and `srsNewPerDay`) is current *settings*, not
  *    accumulated history, so whichever side has the newer `updatedAt` wins for
@@ -195,6 +198,10 @@ export function mergeProfiles(local: Profile, remote: Profile): Profile {
       vocabThreshold: settingsSource.vocabThreshold,
     }),
     excludedLemmas: settingsSource.excludedLemmas,
+    // Imported wholesale rather than accumulated, so the newer import wins
+    // entire. Merging key by key would need per-entry timestamps the file
+    // doesn't carry, and would leave a half-and-half dictionary behind.
+    glosses: settingsSource.glosses,
     tolerance: settingsSource.tolerance,
     readerThreshold: settingsSource.readerThreshold,
     readerPersonalized: settingsSource.readerPersonalized,

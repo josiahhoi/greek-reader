@@ -70,6 +70,12 @@ const cases: [gloss: string, code: string, formId: string, want: string][] = [
   ['I carry', 'V-PAI-3S', 'pres.act.ind', 'he/she/it carries'],
   ['I baptize', 'V-API-3P', 'aor1.pass.ind', 'they were baptized'],
   ['I write', 'V-2RPI-3S', 'perf.pass.ind', 'he/she/it has been written'],
+  // A gloss listing several senses conjugates the first and drops the rest,
+  // which is the shape an imported word list usually comes in.
+  ['I say, speak', 'V-PAI-3S', 'pres.act.ind', 'he/she/it says'],
+  ['I have, hold', 'V-PAI-3S', 'pres.act.ind', 'he/she/it has'],
+  ['I am, exist, live', 'V-IAI-3P', 'impf.act.ind', 'they were'],
+  ['I come, go', 'V-2AAI-3S', 'aor2.act.ind', 'he/she/it came'],
   // Deponents: passive or middle in shape, active in meaning.
   ['I go', 'V-AOI-3S', 'aor1.pass.ind', 'he/she/it went'],
   ['I answer', 'V-AOP-NSM', 'aor1.pass.ptcp', 'having answered'],

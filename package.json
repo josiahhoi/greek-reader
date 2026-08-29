@@ -13,7 +13,8 @@
     "verify:srs": "tsx scripts/verify-srs.ts",
     "verify:activity": "tsx scripts/verify-activity.ts",
     "verify:english": "tsx scripts/verify-english.ts",
-    "build:icons": "tsx scripts/build-icons.ts"
+    "build:icons": "tsx scripts/build-icons.ts",
+    "import:glosses": "tsx scripts/import-anki-glosses.ts"
   },
   "dependencies": {
     "firebase": "^12.17.1",

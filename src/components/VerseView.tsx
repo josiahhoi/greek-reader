@@ -9,12 +9,14 @@ function TokenView({
   isBlocker,
   rmacTable,
   knownForms,
+  glosses,
 }: {
   tok: CorpusToken
   lemma: LemmaEntry
   isBlocker: boolean
   rmacTable: RmacEntry[]
   knownForms: ReadonlySet<string>
+  glosses?: Record<string, string>
 }) {
   const [open, setOpen] = useState(false)
   const rmac = rmacTable[tok.r]
@@ -36,7 +38,13 @@ function TokenView({
       </button>
       {open && (
         <div className="absolute left-1/2 top-full z-10 mt-1 w-56 -translate-x-1/2 rounded-lg border border-stone-200 bg-white p-3 text-left text-sm shadow-lg dark:border-stone-700 dark:bg-stone-900">
-          <WordDetail lemma={lemma} rmac={rmac} knownForms={knownForms} contextGloss={tok.g} />
+          <WordDetail
+          lemma={lemma}
+          rmac={rmac}
+          knownForms={knownForms}
+          contextGloss={tok.g}
+          glosses={glosses}
+        />
         </div>
       )}
     </span>
@@ -50,6 +58,7 @@ export function VerseView({
   rmacTable,
   knownForms,
   blockerIndices,
+  glosses,
 }: {
   verse: CorpusVerse
   bookAbbr: string
@@ -57,6 +66,8 @@ export function VerseView({
   rmacTable: RmacEntry[]
   knownForms: ReadonlySet<string>
   blockerIndices: ReadonlySet<number>
+  /** The learner's imported definitions, shown instead of the corpus gloss. */
+  glosses?: Record<string, string>
 }) {
   const [showTranslation, setShowTranslation] = useState(false)
   const translation = verse.t
@@ -79,6 +90,7 @@ export function VerseView({
               isBlocker={blockerIndices.has(i)}
               rmacTable={rmacTable}
               knownForms={knownForms}
+              glosses={glosses}
             />
           </Fragment>
         ))}
