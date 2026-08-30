@@ -36,6 +36,29 @@ npm run dev
 `npm run build:icons` re-rasterises the home-screen PNGs from `public/app-icon.svg`. The PNGs are
 committed, so only run it when the artwork changes.
 
+## Your own definitions
+
+The corpus ships TBESG's glosses. A learner who has wording they trust — their own deck, their
+grammar's chapter vocabulary — can override them: `profile.glosses` maps a lemma to a definition,
+and where it has an entry that wording is shown everywhere the app names a word.
+
+The list lives on the profile, not in `public/data`. A definition is a preference rather than a fact
+about the corpus, and a vocabulary list transcribed out of a textbook is the learner's to hold, not
+this app's to republish with a corpus it deploys to the open web. It syncs to their other devices
+like the rest of the profile, so it is imported once and then simply present.
+
+`npm run import:glosses -- <deck.apkg>` converts an Anki export into that file (see the script for
+how headwords are matched to lemmas). There is deliberately no upload button in the app; to load a
+file, paste it into the profile from the browser console on the site itself:
+
+```js
+const glosses = /* paste the JSON here */
+const key = `greek-reader:profile:${localStorage.getItem('greek-reader:last-user')}`
+const profile = JSON.parse(localStorage.getItem(key))
+localStorage.setItem(key, JSON.stringify({ ...profile, glosses, updatedAt: Date.now() }))
+location.reload()
+```
+
 ## Install for offline use
 
 The app is a PWA: once installed it holds the whole corpus locally and works with no connection at

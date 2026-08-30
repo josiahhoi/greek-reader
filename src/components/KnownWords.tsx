@@ -3,7 +3,7 @@ import type { LemmaEntry } from '../lib/corpusTypes'
 import type { Profile } from '../lib/profile'
 import { isLemmaKnown } from '../lib/deriveKnown'
 import { countNewlyKnownAbove, markKnownAbove, toggleKnown, KNOWN_TIERS } from '../lib/knownVocab'
-import { glossOf, parseGlossFile } from '../lib/glosses'
+import { glossOf } from '../lib/glosses'
 
 /**
  * "Words I already know", under the flashcard deck. This was the Vocabulary
@@ -23,27 +23,6 @@ export function KnownWords({
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [importResult, setImportResult] = useState<{ ok: boolean; message: string } | null>(null)
-  const glossCount = Object.keys(profile.glosses ?? {}).length
-
-  async function importGlosses(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0]
-    // Cleared so picking the same file twice still fires a change event.
-    event.target.value = ''
-    if (!file) return
-    try {
-      const { glosses, skipped } = parseGlossFile(await file.text())
-      onChange((p) => ({ ...p, glosses }))
-      const count = Object.keys(glosses).length
-      setImportResult({
-        ok: true,
-        message: `${count.toLocaleString()} definitions imported${skipped ? `, ${skipped} skipped` : ''}.`,
-      })
-    } catch (err) {
-      setImportResult({ ok: false, message: err instanceof Error ? err.message : 'Could not read that file.' })
-    }
-  }
-
   const knownCount = useMemo(
     () => lemmas.filter((l) => isLemmaKnown(profile, l)).length,
     [lemmas, profile],
@@ -148,44 +127,6 @@ export function KnownWords({
             <p className="mt-2 text-xs text-stone-400">
               Marking a known word unknown puts it back in the deck, due today.
             </p>
-          </div>
-
-          <div className="border-t border-stone-200 pt-4 dark:border-stone-800">
-            <p className="text-sm font-medium text-stone-700 dark:text-stone-300">My definitions</p>
-            <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">
-              {glossCount > 0
-                ? `${glossCount.toLocaleString()} of your own definitions are in use, shown instead of the built-in gloss wherever a word appears.`
-                : 'Import your own definitions — from your Anki deck or any word list — and they replace the built-in glosses everywhere. They stay on your profile and sync to your other devices.'}
-            </p>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <label className="cursor-pointer rounded-full border border-stone-300 px-3 py-1 text-sm text-stone-600 hover:bg-stone-100 dark:border-stone-700 dark:text-stone-300 dark:hover:bg-stone-800">
-                {glossCount > 0 ? 'Replace file' : 'Choose file'}
-                <input type="file" accept=".json,application/json" onChange={importGlosses} className="hidden" />
-              </label>
-              {glossCount > 0 && (
-                <button
-                  onClick={() => {
-                    onChange((p) => ({ ...p, glosses: {} }))
-                    setImportResult(null)
-                  }}
-                  className="text-xs text-stone-400 underline hover:text-stone-700 dark:hover:text-stone-200"
-                >
-                  Use the built-in glosses again
-                </button>
-              )}
-            </div>
-            {importResult && (
-              <p
-                className={
-                  'mt-2 text-xs ' +
-                  (importResult.ok
-                    ? 'text-emerald-700 dark:text-emerald-400'
-                    : 'text-amber-700 dark:text-amber-400')
-                }
-              >
-                {importResult.message}
-              </p>
-            )}
           </div>
         </div>
       )}
