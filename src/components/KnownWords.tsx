@@ -3,7 +3,6 @@ import type { LemmaEntry } from '../lib/corpusTypes'
 import type { Profile } from '../lib/profile'
 import { isLemmaKnown } from '../lib/deriveKnown'
 import { countNewlyKnownAbove, markKnownAbove, toggleKnown, KNOWN_TIERS } from '../lib/knownVocab'
-import { glossOf } from '../lib/glosses'
 
 /**
  * "Words I already know", under the flashcard deck. This was the Vocabulary
@@ -40,10 +39,10 @@ export function KnownWords({
     return lemmas
       .filter(
         (l) =>
-          l.lemma.toLowerCase().includes(q) || glossOf(profile, l).toLowerCase().includes(q),
+          l.lemma.toLowerCase().includes(q) || l.gloss.toLowerCase().includes(q),
       )
       .slice(0, 30)
-  }, [search, lemmas, profile])
+  }, [search, lemmas])
 
   return (
     <div className="mt-8 rounded-lg border border-stone-200 dark:border-stone-800">
@@ -107,7 +106,7 @@ export function KnownWords({
                   >
                     <span>
                       <span className="greek font-medium">{l.lemma}</span>
-                      <span className="ml-2 text-stone-400">{glossOf(profile, l)}</span>
+                      <span className="ml-2 text-stone-400">{l.gloss}</span>
                       <span className="ml-2 text-xs text-stone-400">×{l.freq}</span>
                     </span>
                     <span

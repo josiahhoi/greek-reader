@@ -4,7 +4,6 @@ import type { Profile } from '../lib/profile'
 import { bump } from '../lib/activity'
 import { useLemmaExamples } from '../hooks/useLemmaExamples'
 import { KnownWords } from './KnownWords'
-import { glossOf } from '../lib/glosses'
 import { displayAfter } from '../lib/chapters'
 import { todayKey } from '../lib/dates'
 import { BOOK_BY_ID } from '../data/books'
@@ -276,7 +275,7 @@ export function Flashcards({
             <>
               <div className="mt-6 text-left">
                 <p className="text-lg text-stone-900 dark:text-stone-100">
-                  {glossOf(profile, lemma)}
+                  {lemma.gloss}
                 </p>
                 <p className="mt-1 text-xs text-stone-400">
                   {lemma.freq}× in the NT · Strong&apos;s {lemma.strongs}

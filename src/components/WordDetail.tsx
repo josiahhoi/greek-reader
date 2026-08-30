@@ -1,6 +1,5 @@
 import type { LemmaEntry, RmacEntry } from '../lib/corpusTypes'
 import { VERB_FORMS } from '../data/verbForms'
-import { lookupGloss } from '../lib/glosses'
 
 /**
  * The lemma/gloss/parse/Strong's block shown for a single word — used by both
@@ -15,7 +14,6 @@ export function WordDetail({
   contextGloss,
   verseRef,
   englishForm,
-  glosses,
 }: {
   lemma: LemmaEntry
   rmac?: RmacEntry
@@ -27,8 +25,6 @@ export function WordDetail({
   verseRef?: string
   /** The English this form comes out as, e.g. "he/she/it was". See englishVerb.ts. */
   englishForm?: string
-  /** The learner's imported definitions, which win over the corpus gloss. */
-  glosses?: Record<string, string>
 }) {
   const form = rmac && rmac.form >= 0 ? VERB_FORMS[rmac.form] : undefined
   const missingForm = form && knownForms && !knownForms.has(form.id) ? form : undefined
@@ -38,7 +34,7 @@ export function WordDetail({
       <p className="greek text-lg font-medium text-stone-900 dark:text-stone-100">
         {lemma.lemma}
       </p>
-      <p className="text-stone-500 dark:text-stone-400">{lookupGloss(glosses, lemma)}</p>
+      <p className="text-stone-500 dark:text-stone-400">{lemma.gloss}</p>
       {rmac && <p className="mt-1 text-xs text-stone-500 dark:text-stone-400">{rmac.label}</p>}
       {englishForm && (
         <p

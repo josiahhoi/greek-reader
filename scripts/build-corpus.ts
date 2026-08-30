@@ -10,6 +10,7 @@ import { ensureOpenGntCsv, ensureRmacLexiconCsv } from './lib/sources.ts'
 import { parseRmacLexicon } from './lib/rmac-lexicon.ts'
 import { parseOpenGnt, type RawToken } from './lib/opengnt.ts'
 import { firstPersonGloss } from './lib/verbGloss.ts'
+import { applyGlossOverrides } from './lib/glossOverrides.ts'
 import { decodeRmacDescription } from '../src/lib/rmac.ts'
 import { VERB_FORM_IDS } from '../src/data/verbForms.ts'
 import { BOOKS } from '../src/data/books.ts'
@@ -161,6 +162,17 @@ async function main() {
     rewritten++
   }
   console.log(`  ${rewritten} verb glosses rewritten to the 1st person`)
+
+  // Then the shipped word list wins wherever it has an entry. Last, so it
+  // overrides both TBESG and the rewrite above.
+  const { applied, unmatched } = applyGlossOverrides(lemmas)
+  console.log(`  ${applied} glosses replaced from scripts/data/glosses.json`)
+  if (unmatched.length > 0) {
+    throw new Error(
+      `${unmatched.length} entries in scripts/data/glosses.json match no lemma in this corpus: ` +
+        unmatched.slice(0, 10).join(', '),
+    )
+  }
 
   writeFileSync(
     path.join(OUT_DIR, 'lemmas.json'),

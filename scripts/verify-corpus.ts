@@ -6,6 +6,7 @@ import { VERB_FORMS, VERB_FORM_IDS } from '../src/data/verbForms.ts'
 import { BOOKS } from '../src/data/books.ts'
 import type { RmacEntry } from '../src/lib/corpusTypes.ts'
 import { firstPersonGloss } from './lib/verbGloss.ts'
+import { loadGlossOverrides } from './lib/glossOverrides.ts'
 
 const DATA_DIR = path.resolve(import.meta.dirname, '..', 'public', 'data')
 
@@ -113,10 +114,45 @@ check(
     .map((l: { lemma: string; gloss: string }) => `${l.lemma} "${l.gloss}"`)
     .join(', '),
 )
+// A shipped definition may split its senses by voice — "active: I rule;
+// middle: I begin" — in which case each branch is headed in the 1st person
+// rather than the whole string. Anything else that isn't "I ..." is an
+// impersonal, which is meant to stay in the third person.
+const firstPersonBranches = (gloss: string) =>
+  gloss.split(';').every((branch) => /^\s*(?:[a-z]+: )?I /.test(branch))
+const notFirstPerson = [...verbLemmaIds]
+  .map((id) => lemmas[id])
+  .filter((l: { gloss: string }) => !firstPersonBranches(l.gloss))
 check(
   'verb glosses are headed in the 1st person',
-  [...verbLemmaIds].filter((id) => lemmas[id].gloss.startsWith('I ')).length === 1827,
+  [...verbLemmaIds].filter((id) => lemmas[id].gloss.startsWith('I ')).length === 1819,
   String([...verbLemmaIds].filter((id) => lemmas[id].gloss.startsWith('I ')).length),
+)
+// The leftovers are the impersonals plus a handful of TBESG glosses that were
+// never verb phrases to begin with (transliterations, "farewell", "encompass").
+// They are exactly the set verify:english declines to render.
+check(
+  'at most 17 verb glosses are not in the 1st person',
+  notFirstPerson.length <= 17,
+  notFirstPerson.map((l: { lemma: string; gloss: string }) => `${l.lemma} "${l.gloss}"`).join(', '),
+)
+
+// --- the shipped definitions are actually in the data --------------------
+// build-corpus.ts applies scripts/data/glosses.json last. If that step is ever
+// dropped, every one of these lemmas quietly reverts to its TBESG gloss, which
+// nothing else here would notice.
+const overrides = loadGlossOverrides()
+const glossByLemma = new Map(lemmas.map((l: { lemma: string; gloss: string }) => [l.lemma, l.gloss]))
+const missing = Object.keys(overrides).filter((lemma) => !glossByLemma.has(lemma))
+const unapplied = Object.entries(overrides).filter(([lemma, definition]) => {
+  const got = glossByLemma.get(lemma)
+  return got !== undefined && got !== (firstPersonGloss(lemma, definition) ?? definition)
+})
+check('every shipped definition names a lemma in the corpus', missing.length === 0, missing.join(', '))
+check(
+  `all ${Object.keys(overrides).length} shipped definitions are applied`,
+  unapplied.length === 0,
+  unapplied.slice(0, 5).map(([lemma]) => lemma).join(', '),
 )
 
 check('sum of per-book verses matches meta', totalVersesInBooks === meta.verseCount)

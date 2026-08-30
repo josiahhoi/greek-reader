@@ -1,13 +1,14 @@
-// Converts an Anki deck export into the gloss-override file the app imports.
+// Converts an Anki deck export into the definition list the corpus ships.
 //
-//   npm run import:glosses -- ~/Downloads/Koine_Greek.apkg [--out glosses.json]
+//   npm run import:glosses -- ~/Downloads/Koine_Greek.apkg --out scripts/data/glosses.json
 //
-// The output is a private, per-learner file: your own definitions, loaded into
-// your profile in the app and synced to your other devices. It is deliberately
-// NOT committed and not built into public/data — the corpus is published to the
-// open web, and a vocabulary list transcribed from a textbook is not ours to
-// republish. Keeping it in the profile also makes definitions what they should
-// be, a preference of yours rather than a fact about the corpus.
+// That file is a build input: build-corpus.ts applies it to every lemma it
+// matches, and npm run apply:glosses replays it over the committed
+// public/data/lemmas.json without a full rebuild. This script is how it was
+// produced in the first place, and how to regenerate it after editing the deck.
+//
+// It writes elsewhere by default, since overwriting the shipped list is a
+// deliberate act — check the unmatched-headword report before you do.
 
 import { spawnSync } from 'node:child_process'
 import { zstdDecompressSync } from 'node:zlib'
@@ -194,4 +195,5 @@ console.log(`\n  notes read:            ${notesRead}`)
 console.log(`  definitions mapped:    ${Object.keys(glosses).length}`)
 console.log(`  headwords unmatched:   ${unmatched.length}`)
 if (unmatched.length) console.log(`    ${unmatched.join(' ')}`)
-console.log(`\nWrote ${outPath} (${(bytes / 1024).toFixed(1)} KB) — import it in the app under "Words I already know".`)
+console.log(`\nWrote ${outPath} (${(bytes / 1024).toFixed(1)} KB).`)
+console.log('To ship it: copy over scripts/data/glosses.json, then npm run apply:glosses && npm run verify:corpus.')

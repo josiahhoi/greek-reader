@@ -240,12 +240,20 @@ function gerund(base: string): string {
  * verb except "am", which is where the whole irregular paradigm of "be" hangs.
  */
 function splitGloss(gloss: string): { heads: string[]; tail: string } | null {
-  if (!gloss.startsWith('I ')) return null
+  // A verb whose senses split by voice or transitivity is written out with the
+  // split labelled — "active: I rule; middle: I begin". Take the first branch
+  // and its label off, since the label is about which Greek voice you are
+  // looking at, not about the English being conjugated.
+  let text = gloss.split(';')[0].trim()
+  const label = /^[a-z]+: /.exec(text)
+  if (label) text = text.slice(label[0].length)
+
+  if (!text.startsWith('I ')) return null
   // Only the first sense is conjugated. A gloss often lists several ("I say,
   // speak" — and an imported one may list six), and conjugating every one turns
   // a one-line study aid into a paragraph. The full definition is on the line
   // above; this line exists to answer which person and number the ending is.
-  const words = gloss.slice(2).split(',')[0].trim().split(' ')
+  const words = text.slice(2).split(',')[0].trim().split(' ')
   const heads = words[0].split('/').map((word) => (word === 'am' ? 'be' : word))
   if (heads.some((head) => !/^[a-z()-]+$/.test(head))) return null
   return { heads, tail: words.slice(1).join(' ') }
@@ -276,7 +284,12 @@ export function englishVerbForm(gloss: string, code: string, form: VerbForm): st
   const plural = parsed.number === 'P'
   const key = parsed.person && parsed.number ? parsed.person + parsed.number : null
   const subject = key ? PRONOUNS[key] : ''
-  const passive = parsed.voice === 'P'
+  // English has no passive of "be", so a gloss headed by it is conjugated as an
+  // active even where the Greek is passive: the paradigm below would otherwise
+  // build "he/she/it is been astonished". Nothing is lost by it, because a gloss
+  // written "I am astonished" is already carrying the passive sense in its own
+  // wording — that is why it was written with "am" in the first place.
+  const passive = parsed.voice === 'P' && !heads.includes('be')
   const isBe = heads[0] === 'be'
   const past = plural ? 'were' : 'was'
   /** Simple past, with "be" taking the was/were the subject calls for. */

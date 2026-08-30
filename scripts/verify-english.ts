@@ -70,12 +70,21 @@ const cases: [gloss: string, code: string, formId: string, want: string][] = [
   ['I carry', 'V-PAI-3S', 'pres.act.ind', 'he/she/it carries'],
   ['I baptize', 'V-API-3P', 'aor1.pass.ind', 'they were baptized'],
   ['I write', 'V-2RPI-3S', 'perf.pass.ind', 'he/she/it has been written'],
+  // A gloss headed "I am ..." already reads as a passive in English, so its
+  // Greek passive conjugates as an active rather than as "is been astonished".
+  ['I am astonished', 'V-API-3P', 'aor1.pass.ind', 'they were astonished'],
+  ['I am ignorant', 'V-PPI-3S', 'pres.pass.ind', 'he/she/it is ignorant'],
   // A gloss listing several senses conjugates the first and drops the rest,
   // which is the shape an imported word list usually comes in.
   ['I say, speak', 'V-PAI-3S', 'pres.act.ind', 'he/she/it says'],
   ['I have, hold', 'V-PAI-3S', 'pres.act.ind', 'he/she/it has'],
   ['I am, exist, live', 'V-IAI-3P', 'impf.act.ind', 'they were'],
   ['I come, go', 'V-2AAI-3S', 'aor2.act.ind', 'he/she/it came'],
+  // A gloss that splits its senses by voice or transitivity conjugates the
+  // first branch, label and all the rest dropped.
+  ['active: I rule; middle: I begin', 'V-PAI-3S', 'pres.act.ind', 'he/she/it rules'],
+  ['intrans: I rise, get up; trans: I raise', 'V-2AAI-3S', 'aor2.act.ind', 'he/she/it rose'],
+  ['active: I shine; passive: I appear', 'V-PAP-NSM', 'pres.act.ptcp', 'shining'],
   // Deponents: passive or middle in shape, active in meaning.
   ['I go', 'V-AOI-3S', 'aor1.pass.ind', 'he/she/it went'],
   ['I answer', 'V-AOP-NSM', 'aor1.pass.ptcp', 'having answered'],
@@ -117,8 +126,13 @@ for (const [lemmaId, codes] of seen) {
     }
     rendered++
     // Double spaces, a dangling slash, or a stray "undefined" all mean a branch
-    // built its phrase out of something it didn't have.
-    if (/\s\s|\/\s|\s\/|undefined|^\s|\s$/.test(english) || english.length === 0) {
+    // built its phrase out of something it didn't have. "is been" and its
+    // relatives mean a gloss headed by "be" was put through the passive.
+    if (
+      /\s\s|\/\s|\s\/|undefined|^\s|\s$/.test(english) ||
+      /\b(?:is|are|am|was|were|be|been|being)\s+been\b/.test(english) ||
+      english.length === 0
+    ) {
       malformed.push(`${entry.code} ${lemmas[lemmaId].gloss} -> "${english}"`)
     }
   }

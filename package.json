@@ -9,6 +9,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "build:corpus": "tsx scripts/build-corpus.ts",
+    "apply:glosses": "tsx scripts/apply-glosses.ts",
     "verify:corpus": "tsx scripts/verify-corpus.ts",
     "verify:srs": "tsx scripts/verify-srs.ts",
     "verify:activity": "tsx scripts/verify-activity.ts",

@@ -36,28 +36,27 @@ npm run dev
 `npm run build:icons` re-rasterises the home-screen PNGs from `public/app-icon.svg`. The PNGs are
 committed, so only run it when the artwork changes.
 
-## Your own definitions
+## Definitions
 
-The corpus ships TBESG's glosses. A learner who has wording they trust — their own deck, their
-grammar's chapter vocabulary — can override them: `profile.glosses` maps a lemma to a definition,
-and where it has an entry that wording is shown everywhere the app names a word.
+The words are defined by the owner's own vocabulary list, matched to Mounce, in
+`scripts/data/glosses.json`: 491 entries keyed by corpus lemma. Anywhere the app names a word —
+flashcard, reader popover, parsing card, word search — that wording is what it shows. The corpus's
+own TBESG gloss fills in the remaining ~4,900 lemmas.
 
-The list lives on the profile, not in `public/data`. A definition is a preference rather than a fact
-about the corpus, and a vocabulary list transcribed out of a textbook is the learner's to hold, not
-this app's to republish with a corpus it deploys to the open web. It syncs to their other devices
-like the rest of the profile, so it is imported once and then simply present.
+The list is a build input, applied last by `build-corpus.ts` so it beats both TBESG and the
+1st-person rewrite above it. Editing it doesn't need a full corpus rebuild:
 
-`npm run import:glosses -- <deck.apkg>` converts an Anki export into that file (see the script for
-how headwords are matched to lemmas). There is deliberately no upload button in the app; to load a
-file, paste it into the profile from the browser console on the site itself:
-
-```js
-const glosses = /* paste the JSON here */
-const key = `greek-reader:profile:${localStorage.getItem('greek-reader:last-user')}`
-const profile = JSON.parse(localStorage.getItem(key))
-localStorage.setItem(key, JSON.stringify({ ...profile, glosses, updatedAt: Date.now() }))
-location.reload()
+```sh
+npm run apply:glosses  # rewrites public/data/lemmas.json in place
+npm run verify:corpus  # asserts all 491 landed
 ```
+
+Definitions split by voice are written with the split labelled — `active: I rule; middle: I begin`.
+The parsing card's English line conjugates the first branch and drops the label.
+
+`npm run import:glosses -- <deck.apkg>` is how the list was produced, from an Anki export; see the
+script for how deck headwords are matched to corpus lemmas. There is no import UI in the app —
+these are the app's definitions, not a per-profile setting.
 
 ## Install for offline use
 

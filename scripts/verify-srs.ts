@@ -7,7 +7,6 @@ import {
 import { mergeSrsDecks } from '../src/lib/sync'
 import { markKnownAbove, migrateKnownVocab, toggleKnown } from '../src/lib/knownVocab'
 import { isLemmaKnown } from '../src/lib/deriveKnown'
-import { glossOf, parseGlossFile } from '../src/lib/glosses'
 import { defaultProfile, type Profile } from '../src/lib/profile'
 import type { LemmaEntry } from '../src/lib/corpusTypes'
 
@@ -202,22 +201,6 @@ check('migration writes them as cards', Object.keys(migrated.srs).sort().join(',
 check('migration is idempotent', migrateKnownVocab(migrated, vocab, D(T)) === migrated)
 check('every known word now has a card', vocab.every((l) => !isLemmaKnown(migrated, l) || migrated.srs[l.lemma] !== undefined))
 check('a profile with no threshold is untouched', migrateKnownVocab(base, vocab, D(T)) === base)
-
-// --- imported definitions ---
-const withGlosses: Profile = { ...base, glosses: { alpha: 'my own wording' } }
-check('an imported definition wins over the corpus gloss', glossOf(withGlosses, vocab[0]) === 'my own wording', glossOf(withGlosses, vocab[0]))
-check('a lemma with no import keeps the corpus gloss', glossOf(withGlosses, vocab[1]) === 'b', glossOf(withGlosses, vocab[1]))
-check('a profile with no imports keeps every corpus gloss', glossOf(base, vocab[0]) === 'a')
-
-const parsed = parseGlossFile('{"alpha":"one","beta":"  two  ","gamma":123,"delta":""}')
-check('parses a lemma -> definition file', parsed.glosses.alpha === 'one', JSON.stringify(parsed.glosses))
-check('trims whitespace around a definition', parsed.glosses.beta === 'two')
-check('drops entries that are not text, counting them', parsed.skipped === 2, String(parsed.skipped))
-for (const [label, bad] of [['not json', 'nope'], ['an array', '[1,2]'], ['no usable entries', '{"a":null}']] as const) {
-  let threw = false
-  try { parseGlossFile(bad) } catch { threw = true }
-  check(`rejects ${label} rather than importing nothing silently`, threw)
-}
 
 // --- merge ---
 const A: SrsDeck = { x: { ...newCard(T), reviewed: 100 }, y: { ...newCard(T), reviewed: 200 } }

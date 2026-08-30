@@ -70,16 +70,6 @@ export interface Profile {
    * rather than a counter that would need an additive merge.
    */
   readLog: Record<string, string>
-  /**
-   * Your own definitions, lemma -> gloss, imported from a word list you keep
-   * elsewhere. Absent unless you import one; where a lemma has an entry it is
-   * shown instead of the corpus gloss everywhere the app names a word.
-   *
-   * Deliberately per-profile rather than baked into public/data: a definition
-   * is a preference, and a list transcribed out of a textbook is yours to hold,
-   * not ours to publish with the corpus.
-   */
-  glosses?: Record<string, string>
   updatedAt: number
 }
 

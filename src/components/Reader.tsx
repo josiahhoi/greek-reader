@@ -125,7 +125,6 @@ export function Reader({
                             rmacTable={corpus.rmacTable}
                             knownForms={ctx.knownForms}
                             blockerIndices={new Set(sv.blockerIndices)}
-                            glosses={profile.glosses}
                           />
                         </div>
                       </div>

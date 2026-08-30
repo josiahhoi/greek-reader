@@ -24,5 +24,6 @@ dist-ssr
 *.sw?
 .cache/
 
-# Imported personal definitions: private to a learner, never committed.
+# The importer's scratch output. The shipped list is scripts/data/glosses.json,
+# copied over deliberately once the unmatched-headword report has been read.
 greek-reader-glosses.json
